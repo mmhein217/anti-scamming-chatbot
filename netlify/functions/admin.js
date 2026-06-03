@@ -53,7 +53,7 @@ exports.handler = async function(event) {
       let stats = {
         apiConfigured: !!process.env.GEMINI_API_KEY,
         supabaseConfigured: hasSupabase,
-        model: process.env.GEMINI_MODEL || 'gemini-1.5-pro',
+        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
         timestamp: new Date().toISOString(),
         totalMessages: 0,
         totalSessions: 0,

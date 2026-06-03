@@ -51,9 +51,9 @@ exports.handler = async function(event) {
     // ── STATS ──
     if (action === 'stats') {
       let stats = {
-        apiConfigured: !!process.env.ANTHROPIC_API_KEY,
+        apiConfigured: !!process.env.GEMINI_API_KEY,
         supabaseConfigured: hasSupabase,
-        model: 'claude-sonnet-4-20250514',
+        model: process.env.GEMINI_MODEL || 'gemini-1.5-pro',
         timestamp: new Date().toISOString(),
         totalMessages: 0,
         totalSessions: 0,

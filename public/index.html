@@ -83,7 +83,7 @@ textarea::placeholder{color:var(--text3)}
     <div class="hdr-shield">🛡️</div>
     <div class="hdr-info">
       <h1>Scam Guard AI · စကမ်းကာကွယ်</h1>
-      <p>နယ်စပ်ဒေသ Anti-Scam · Claude AI Powered</p>
+      <p>နယ်စပ်ဒေသ Anti-Scam · Gemini AI Powered</p>
     </div>
     <div class="hdr-right">
       <div class="online-badge" id="status">Online</div>
@@ -184,7 +184,7 @@ async function send(){
   }catch(e){
     removeTyping();
     appendLog('error',e.message);
-    addMsg('ဆောင်ရွက်မရပါ။\n\nဖြစ်နိုင်သည့် အကြောင်းရင်းများ:\n• Internet connection စစ်ဆေးပါ\n• Admin panel တွင် API key ထည့်ထားမထားကို စစ်ဆေးပါ\n\nError: '+e.message,'b');
+    addMsg('ဆောင်ရွက်မရပါ။\n\nဖြစ်နိုင်သည့် အကြောင်းရင်းများ:\n• Internet connection စစ်ဆေးပါ\n• Admin panel တွင် GEMINI_API_KEY ထည့်ထားမထားကို စစ်ဆေးပါ\n• Gemini free tier rate limit ထိပါက တစ်မိနစ် စောင့်ပြီး ထပ်ကြိုးစားပါ\n\nError: '+e.message,'b');
   }
   busy=false;sbtnEl.disabled=false;
 }

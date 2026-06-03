@@ -338,8 +338,8 @@ tr:hover td{background:var(--brl)}
           <div class="guide">
 
             <div class="gs"><div class="gsn">1</div><div class="gsb">
-              <strong>Get Claude API Key</strong>
-              <p>Go to <strong>console.anthropic.com</strong> → API Keys → Create new key. Copy it (starts with <code>sk-ant-...</code>)</p>
+              <strong>Get Gemini API Key (Free)</strong>
+              <p>Go to <strong>aistudio.google.com</strong> → Sign in with Google → <strong>Get API key</strong> → <strong>Create API key</strong>. Copy it (starts with <code>AIza...</code>).<br><br>Free tier: <strong>gemini-1.5-pro</strong> = 2 req/min, 50 req/day &nbsp;|&nbsp; <strong>gemini-2.0-flash</strong> = 15 req/min, 1,500 req/day<br>To switch model, set <code>GEMINI_MODEL</code> env var to <code>gemini-2.0-flash</code></p>
             </div></div>
 
             <div class="gs"><div class="gsn">2</div><div class="gsb">
@@ -407,10 +407,11 @@ tr:hover td{background:var(--brl)}
               <strong>Set All Environment Variables</strong>
               <p>Netlify → Site → Environment variables → Add these 4 variables:</p>
               <div style="margin-top:8px;background:var(--s2);border-radius:var(--rsm);padding:12px;font-size:12.5px;line-height:2">
-                <strong>ANTHROPIC_API_KEY</strong> = <code>sk-ant-...</code><br>
+                <strong>GEMINI_API_KEY</strong> = <code>AIza...</code> (from aistudio.google.com)<br>
                 <strong>ADMIN_TOKEN</strong> = <code>YourSecurePassword123!</code><br>
-                <strong>SUPABASE_URL</strong> = <code>https://xxxx.supabase.co</code><br>
-                <strong>SUPABASE_ANON_KEY</strong> = <code>eyJ...</code>
+                <strong>SUPABASE_URL</strong> = <code>https://jjezdajcszhivlvubzfq.supabase.co</code><br>
+                <strong>SUPABASE_ANON_KEY</strong> = <code>eyJ...</code><br>
+                <strong>GEMINI_MODEL</strong> = <code>gemini-2.0-flash</code> <em style="color:var(--t3)">(optional — default is gemini-1.5-pro)</em>
               </div>
             </div></div>
 
@@ -518,9 +519,9 @@ async function loadOverview() {
     // API card
     document.getElementById('api-card').innerHTML = d.apiConfigured
       ? `<div class="spill sp-ok" style="display:inline-flex;margin-bottom:10px"><div class="sp-dot"></div>Connected</div>
-         <p style="font-size:12.5px;color:var(--t2);line-height:1.6">Claude Sonnet 4 is active. All chat requests are being proxied securely through the Netlify serverless function.</p>`
+         <p style="font-size:12.5px;color:var(--t2);line-height:1.6">Gemini <strong>${d.model}</strong> is active. All chat requests are proxied securely through the Netlify serverless function. API key is never exposed to the browser.</p>`
       : `<div class="spill sp-err" style="display:inline-flex;margin-bottom:10px"><div class="sp-dot"></div>Not configured</div>
-         <p style="font-size:12.5px;color:var(--dt);line-height:1.6">Add <strong>ANTHROPIC_API_KEY</strong> to Netlify → Site → Environment variables, then redeploy.</p>`;
+         <p style="font-size:12.5px;color:var(--dt);line-height:1.6">Add <strong>GEMINI_API_KEY</strong> to Netlify → Site → Environment variables, then redeploy. Get your key at <strong>aistudio.google.com</strong>.</p>`;
 
     // DB card
     document.getElementById('db-card').innerHTML = d.supabaseConfigured

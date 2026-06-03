@@ -178,7 +178,7 @@ tr:hover td{background:var(--brl)}
       <input type="password" id="pwd" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')login()">
     </div>
     <button class="lbtn" onclick="login()">Login →</button>
-    <p class="lnote">Password = <code>ADMIN_TOKEN</code> in Netlify env vars<br>Local default: <code>scamguard-admin-2025</code></p>
+    <p class="lnote">Password = <code>ADMIN_TOKEN</code> value in Netlify environment variables</p>
   </div>
 </div>
 
@@ -432,30 +432,57 @@ tr:hover td{background:var(--brl)}
 <div class="toast" id="toast"></div>
 
 <script>
-// ── AUTH ──
-const DEFAULT_PW = 'scamguard-admin-2025';
+// ── AUTH — server-side verify against ADMIN_TOKEN env var ──
 let adminToken = null;
 
-function login() {
-  const pw = document.getElementById('pwd').value;
-  const hash = btoa(pw);
-  const stored = localStorage.getItem('sg_pw') || btoa(DEFAULT_PW);
-  if (hash === stored) {
-    adminToken = pw;
-    sessionStorage.setItem('sg_tok', hash);
-    document.getElementById('gate').style.display = 'none';
-    document.getElementById('shell').style.display = 'flex';
-    document.getElementById('shell').style.flexDirection = 'column';
-    init();
-  } else {
-    document.getElementById('lerr').style.display = 'block';
-    document.getElementById('pwd').value = '';
+async function login() {
+  const pw = document.getElementById('pwd').value.trim();
+  if (!pw) return;
+  const btn = document.querySelector('.lbtn');
+  btn.textContent = 'Checking...'; btn.disabled = true;
+  const err = document.getElementById('lerr');
+  err.style.display = 'none';
+
+  try {
+    // Send password to server — if ADMIN_TOKEN matches, returns 200
+    const r = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': pw },
+      body: JSON.stringify({ action: 'stats' })
+    });
+
+    if (r.ok) {
+      // Password correct — store in sessionStorage and proceed
+      adminToken = pw;
+      sessionStorage.setItem('sg_tok', pw);
+      showShell();
+    } else {
+      err.textContent = r.status === 401
+        ? 'Incorrect password. Check your ADMIN_TOKEN in Netlify environment variables.'
+        : 'Server error: ' + r.status + '. Make sure Netlify functions are deployed.';
+      err.style.display = 'block';
+      document.getElementById('pwd').value = '';
+    }
+  } catch(e) {
+    err.textContent = 'Cannot reach server. Make sure you are on the Netlify URL, not a local file.';
+    err.style.display = 'block';
   }
+  btn.textContent = 'Login →'; btn.disabled = false;
 }
-function logout() { sessionStorage.removeItem('sg_tok'); location.reload(); }
+
+function showShell() {
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('shell').style.display = 'flex';
+  document.getElementById('shell').style.flexDirection = 'column';
+  init();
+}
+
+function logout() { sessionStorage.removeItem('sg_tok'); adminToken = null; location.reload(); }
+
+// Auto-restore session
 const saved = sessionStorage.getItem('sg_tok');
 if (saved) {
-  adminToken = atob(saved);
+  adminToken = saved;
   document.getElementById('gate').style.display = 'none';
   document.getElementById('shell').style.display = 'flex';
   document.getElementById('shell').style.flexDirection = 'column';
@@ -504,7 +531,7 @@ async function loadOverview() {
     // Status pills
     const pills = [];
     pills.push(`<div class="spill sp-ok"><div class="sp-dot"></div>Authenticated ✓</div>`);
-    pills.push(`<div class="spill ${d.apiConfigured?'sp-ok':'sp-err'}"><div class="sp-dot"></div>${d.apiConfigured ? 'Claude API Connected ✓' : '⚠ ANTHROPIC_API_KEY not set'}</div>`);
+    pills.push(`<div class="spill ${d.apiConfigured?'sp-ok':'sp-err'}"><div class="sp-dot"></div>${d.apiConfigured ? 'Gemini API Connected ✓' : '⚠ GEMINI_API_KEY not set'}</div>`);
     pills.push(`<div class="spill ${d.supabaseConfigured?'sp-ok':'sp-warn'}"><div class="sp-dot"></div>${d.supabaseConfigured ? 'Supabase Connected ✓' : 'Supabase not configured'}</div>`);
     pills.push(`<div class="spill sp-info"><div class="sp-dot"></div>Model: ${d.model}</div>`);
     pills.push(`<div style="margin-left:auto;font-size:11.5px;color:var(--t3)">${new Date(d.timestamp).toLocaleString()}</div>`);
@@ -701,12 +728,9 @@ function changePw() {
   if (!pw) { toast('Enter a new password'); return; }
   if (pw !== pw2) { toast('Passwords do not match'); return; }
   if (pw.length < 8) { toast('Password must be at least 8 characters'); return; }
-  localStorage.setItem('sg_pw', btoa(pw));
-  adminToken = pw;
-  sessionStorage.setItem('sg_tok', btoa(pw));
+  toast('⚠ To change the real password, update ADMIN_TOKEN in Netlify → Environment variables → Redeploy');
   document.getElementById('new-pw').value = '';
   document.getElementById('new-pw2').value = '';
-  toast('✓ Password updated (local only — also update ADMIN_TOKEN in Netlify)');
 }
 
 // ── DELETE LOGS ──

@@ -162,7 +162,7 @@ exports.handler = async function(event) {
   // ── Gemini API call
   // Model: gemini-1.5-pro (best quality, free tier: 2 RPM, 50 RPD on free; paid: 1000 RPM)
   // Alternative: gemini-2.0-flash (faster, higher free limits: 15 RPM, 1500 RPD)
-  const model = process.env.GEMINI_MODEL || 'gemini-1.5-pro';
+  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
 
   const geminiPayload = {

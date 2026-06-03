@@ -1,0 +1,15 @@
+{
+  "name": "scamguard-myanmar",
+  "version": "1.0.0",
+  "description": "Myanmar Anti-Scam AI Chatbot with Admin Panel",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'No build step needed'"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@supabase/supabase-js": "^2.49.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
+  }
+}

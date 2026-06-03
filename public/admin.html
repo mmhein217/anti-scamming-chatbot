@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Admin · Scam Guard AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --br:#7C3626;--brd:#5A2518;--brl:#F9F0EB;
+  --bg:#F5EFE8;--s:#fff;--s2:#F3EDE7;--s3:#EDE4DB;
+  --bd:rgba(124,54,38,.13);--bd2:rgba(124,54,38,.22);
+  --t:#1A0D06;--t2:#6B3E2A;--t3:#9A7060;
+  --dbg:#FEF2F2;--db:#E24B4A;--dt:#7F1D1D;
+  --sbg:#F0FDF4;--sb:#22C55E;--st:#14532D;
+  --wbg:#FFFBEB;--wb:#F59E0B;--wt:#78350F;
+  --ibg:#EFF6FF;--ib:#3B82F6;--it:#1E3A8A;
+  --r:12px;--rsm:8px;--f:'Plus Jakarta Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--f);background:var(--bg);color:var(--t);min-height:100vh}
+
+/* LOGIN */
+#gate{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.lcard{background:var(--s);border:0.5px solid var(--bd2);border-radius:20px;padding:36px 32px;max-width:380px;width:100%;box-shadow:0 4px 24px rgba(124,54,38,.12)}
+.lic{text-align:center;margin-bottom:24px}
+.lic .sh{width:54px;height:54px;border-radius:50%;background:var(--br);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 12px}
+.lic h1{font-size:20px;font-weight:700;color:var(--brd)}
+.lic p{font-size:13px;color:var(--t3);margin-top:3px}
+.lerr{background:var(--dbg);border:0.5px solid var(--db);color:var(--dt);padding:8px 12px;border-radius:var(--rsm);font-size:13px;margin-bottom:14px;display:none}
+.fl{margin-bottom:16px}
+.fl label{display:block;font-size:12px;font-weight:600;color:var(--t2);margin-bottom:5px}
+.fl input{width:100%;padding:10px 13px;border:0.5px solid var(--bd2);border-radius:var(--rsm);font-size:14px;font-family:var(--f);color:var(--t);background:var(--s2);outline:none;transition:border-color .15s}
+.fl input:focus{border-color:var(--br)}
+.lbtn{width:100%;padding:11px;border-radius:var(--rsm);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--f);border:none;background:var(--br);color:#fff}
+.lbtn:hover{opacity:.88}
+.lnote{font-size:12px;color:var(--t3);text-align:center;margin-top:14px;line-height:1.7}
+.lnote code{background:var(--s2);padding:1px 6px;border-radius:4px;font-size:11.5px}
+
+/* SHELL */
+#shell{display:none;flex-direction:column;min-height:100vh}
+.topbar{background:var(--br);padding:12px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.topbar h1{color:#fff;font-size:15px;font-weight:700;flex:1}
+.topbar a{color:rgba(255,255,255,.7);font-size:12px;text-decoration:none;padding:5px 11px;border-radius:6px;border:0.5px solid rgba(255,255,255,.25)}
+.topbar a:hover{background:rgba(255,255,255,.12);color:#fff}
+.lout{background:none;border:0.5px solid rgba(255,255,255,.3);color:rgba(255,255,255,.8);font-size:12px;padding:5px 11px;border-radius:6px;cursor:pointer;font-family:var(--f)}
+.lout:hover{background:rgba(255,255,255,.1);color:#fff}
+
+/* TABS */
+.tabs{background:var(--s);border-bottom:0.5px solid var(--bd2);display:flex;overflow-x:auto;flex-shrink:0}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:12px 20px;font-size:13px;font-weight:600;color:var(--t3);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .15s}
+.tab.active{color:var(--br);border-bottom-color:var(--br)}
+.tab:hover{color:var(--t2)}
+
+.content{padding:20px;max-width:1100px;margin:0 auto;width:100%;flex:1}
+.pane{display:none}.pane.active{display:block}
+
+/* STATUS */
+.sbar{background:var(--s);border:0.5px solid var(--bd2);border-radius:var(--r);padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.spill{display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 12px;border-radius:20px;font-weight:500}
+.sp-ok{background:var(--sbg);color:var(--st)}
+.sp-err{background:var(--dbg);color:var(--dt)}
+.sp-warn{background:var(--wbg);color:var(--wt)}
+.sp-info{background:var(--ibg);color:var(--it)}
+.sp-dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.9}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:20px}
+.card{background:var(--s);border:0.5px solid var(--bd2);border-radius:var(--r);overflow:hidden}
+.ch{padding:12px 16px;background:var(--s2);border-bottom:0.5px solid var(--bd);display:flex;align-items:center;gap:8px}
+.ch h3{font-size:13.5px;font-weight:700;color:var(--t);flex:1}
+.cb{padding:16px}
+
+/* STAT CARDS */
+.srow{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:20px}
+.sc{background:var(--s);border:0.5px solid var(--bd2);border-radius:var(--r);padding:14px}
+.sc .sv{font-size:28px;font-weight:700;color:var(--brd);line-height:1}
+.sc .sl{font-size:11.5px;color:var(--t3);margin-top:4px;line-height:1.4}
+.sc .st{font-size:10.5px;padding:2px 8px;border-radius:10px;margin-top:8px;display:inline-block;font-weight:600}
+
+/* FORM */
+.f{margin-bottom:14px}
+.f label{display:block;font-size:12px;font-weight:600;color:var(--t2);margin-bottom:5px}
+.f input,.f textarea,.f select{width:100%;padding:9px 12px;border:0.5px solid var(--bd2);border-radius:var(--rsm);font-size:13px;font-family:var(--f);color:var(--t);background:var(--s2);outline:none;transition:border-color .15s}
+.f input:focus,.f textarea:focus,.f select:focus{border-color:var(--br)}
+.f textarea{resize:vertical;min-height:80px}
+.hint{font-size:11px;color:var(--t3);margin-top:3px;line-height:1.5}
+.brow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.btn{padding:8px 16px;border-radius:var(--rsm);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--f);border:none;transition:all .15s}
+.bp{background:var(--br);color:#fff}.bp:hover{background:var(--brd)}
+.bd2{background:var(--dbg);color:var(--dt);border:0.5px solid var(--db)}.bd2:hover{background:#FEE2E2}
+.bs{background:var(--s2);color:var(--t2);border:0.5px solid var(--bd2)}.bs:hover{background:var(--s3)}
+.bsm{padding:6px 12px;font-size:12px}
+
+/* LOGS TABLE */
+.log-filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end}
+.log-filters input,.log-filters select{padding:7px 10px;border:0.5px solid var(--bd2);border-radius:var(--rsm);font-size:12.5px;font-family:var(--f);color:var(--t);background:var(--s2);outline:none;min-width:140px}
+.log-filters input:focus,.log-filters select:focus{border-color:var(--br)}
+.tbl-wrap{overflow-x:auto;border-radius:var(--rsm);border:0.5px solid var(--bd2)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;padding:9px 12px;background:var(--s2);color:var(--t2);font-weight:600;font-size:11.5px;border-bottom:0.5px solid var(--bd2);white-space:nowrap}
+td{padding:9px 12px;border-bottom:0.5px solid var(--bd);color:var(--t);vertical-align:top;max-width:320px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--brl)}
+.msg-cell{white-space:pre-wrap;word-break:break-word;line-height:1.55;font-size:12.5px}
+.rpill{display:inline-block;font-size:10px;padding:1px 7px;border-radius:8px;font-weight:600;white-space:nowrap}
+.r-user{background:var(--ibg);color:var(--it)}
+.r-bot{background:var(--sbg);color:var(--st)}
+.r-err{background:var(--dbg);color:var(--dt)}
+.pagination{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--t2)}
+.page-info{flex:1;text-align:center}
+
+/* SESSIONS */
+.sess-list{display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto}
+.sess-item{background:var(--s2);border-radius:var(--rsm);padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;border:0.5px solid transparent;transition:all .15s}
+.sess-item:hover,.sess-item.active{border-color:var(--br);background:var(--brl)}
+.sess-icon{font-size:18px}
+.sess-info{flex:1}
+.sess-info strong{font-size:13px;color:var(--t);display:block}
+.sess-info span{font-size:11.5px;color:var(--t3)}
+.sess-badge{background:var(--br);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+
+/* KEYWORD BARS */
+.kw-list{display:flex;flex-direction:column;gap:8px}
+.kw-row{display:flex;align-items:center;gap:10px}
+.kw-label{font-size:12.5px;color:var(--t2);width:140px;flex-shrink:0}
+.kw-bar-wrap{flex:1;background:var(--s2);border-radius:4px;height:8px;overflow:hidden}
+.kw-bar{height:100%;background:var(--br);border-radius:4px;transition:width .5s ease;min-width:2px}
+.kw-count{font-size:12px;font-weight:700;color:var(--brd);width:32px;text-align:right}
+
+/* SETUP GUIDE */
+.guide{display:flex;flex-direction:column;gap:10px}
+.gs{background:var(--s2);border-radius:var(--rsm);padding:13px 14px;display:flex;gap:11px}
+.gsn{width:24px;height:24px;border-radius:50%;background:var(--br);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.gsb strong{font-size:13.5px;color:var(--t);display:block;margin-bottom:3px;font-weight:700}
+.gsb p{font-size:12.5px;color:var(--t2);line-height:1.65}
+.gsb code{background:var(--s);border:0.5px solid var(--bd2);padding:1px 6px;border-radius:4px;font-size:12px;font-family:monospace;color:var(--brd)}
+.sql-block{background:#1E1E2E;color:#CDD6F4;padding:14px;border-radius:var(--rsm);font-family:monospace;font-size:12px;line-height:1.7;overflow-x:auto;margin-top:8px;position:relative}
+.copy-btn{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.1);color:#CDD6F4;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--f)}
+.copy-btn:hover{background:rgba(255,255,255,.2)}
+.kw-high{color:var(--dt)}
+.kw-str{color:#a6e3a1}
+.kw-num{color:#fab387}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--brd);color:#fff;padding:10px 18px;border-radius:var(--rsm);font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .25s;pointer-events:none;max-width:300px}
+.toast.show{opacity:1}
+
+/* LOADING */
+.loading{display:flex;align-items:center;gap:8px;color:var(--t3);font-size:13px;padding:16px}
+.spin{width:16px;height:16px;border:2px solid var(--bd2);border-top-color:var(--br);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:600px){
+  .content{padding:12px}
+  .grid{grid-template-columns:1fr}
+  .srow{grid-template-columns:1fr 1fr}
+  .log-filters{flex-direction:column}
+  .log-filters input,.log-filters select{min-width:unset;width:100%}
+  td:nth-child(3){display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="gate">
+  <div class="lcard">
+    <div class="lic">
+      <div class="sh">🔐</div>
+      <h1>Admin Panel</h1>
+      <p>Scam Guard AI — Secure Access</p>
+    </div>
+    <div class="lerr" id="lerr">Incorrect password. Please try again.</div>
+    <div class="fl">
+      <label>Admin Password</label>
+      <input type="password" id="pwd" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')login()">
+    </div>
+    <button class="lbtn" onclick="login()">Login →</button>
+    <p class="lnote">Password = <code>ADMIN_TOKEN</code> in Netlify env vars<br>Local default: <code>scamguard-admin-2025</code></p>
+  </div>
+</div>
+
+<!-- SHELL -->
+<div id="shell">
+  <div class="topbar">
+    <h1>🛡️ Scam Guard — Admin</h1>
+    <a href="index.html">← Back to Chat</a>
+    <button class="lout" onclick="logout()">Logout</button>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="tab('overview',this)">📊 Overview</div>
+    <div class="tab" onclick="tab('logs',this)">📋 Chat Logs</div>
+    <div class="tab" onclick="tab('sessions',this)">👥 Sessions</div>
+    <div class="tab" onclick="tab('keywords',this)">🔍 Keywords</div>
+    <div class="tab" onclick="tab('config',this)">⚙️ Config</div>
+    <div class="tab" onclick="tab('setup',this)">🚀 Setup Guide</div>
+  </div>
+  <div class="content">
+
+    <!-- OVERVIEW -->
+    <div class="pane active" id="pane-overview">
+      <div class="sbar" id="sbar">
+        <div class="loading"><div class="spin"></div>Checking status...</div>
+      </div>
+      <div class="srow" id="stat-row">
+        <div class="sc"><div class="sv" id="st-msgs">–</div><div class="sl">Total Messages</div></div>
+        <div class="sc"><div class="sv" id="st-sess">–</div><div class="sl">Total Sessions</div></div>
+        <div class="sc"><div class="sv" id="st-24h">–</div><div class="sl">Last 24 Hours</div></div>
+        <div class="sc"><div class="sv" id="st-err">–</div><div class="sl">Errors Today</div></div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="ch"><h3>🔑 API Status</h3></div>
+          <div class="cb" id="api-card"><div class="loading"><div class="spin"></div>Checking...</div></div>
+        </div>
+        <div class="card">
+          <div class="ch"><h3>🗄️ Database Status</h3></div>
+          <div class="cb" id="db-card"><div class="loading"><div class="spin"></div>Checking...</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><h3>📈 Quick Actions</h3></div>
+        <div class="cb">
+          <div class="brow">
+            <button class="btn bp bsm" onclick="loadOverview()">↻ Refresh Stats</button>
+            <button class="btn bs bsm" onclick="tab('logs',document.querySelectorAll('.tab')[1])">View Logs</button>
+            <button class="btn bs bsm" onclick="tab('setup',document.querySelectorAll('.tab')[5])">Setup Guide</button>
+            <button class="btn bd2 bsm" onclick="confirmDeleteLogs()">🗑 Clear Old Logs</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="pane" id="pane-logs">
+      <div class="log-filters">
+        <input type="text" id="search-input" placeholder="Search messages..." oninput="debouncedSearch()">
+        <select id="role-filter" onchange="loadLogs(0)">
+          <option value="">All roles</option>
+          <option value="user">User only</option>
+          <option value="assistant">AI only</option>
+          <option value="error">Errors only</option>
+        </select>
+        <input type="text" id="session-filter" placeholder="Session ID..." oninput="debouncedSearch()">
+        <button class="btn bp bsm" onclick="loadLogs(0)">Search</button>
+        <button class="btn bs bsm" onclick="exportLogs()">Export CSV</button>
+      </div>
+      <div id="logs-wrap"><div class="loading"><div class="spin"></div>Loading logs...</div></div>
+      <div class="pagination" id="pagination" style="display:none">
+        <button class="btn bs bsm" id="prev-btn" onclick="loadLogs(currentOffset-100)">← Prev</button>
+        <span class="page-info" id="page-info"></span>
+        <button class="btn bs bsm" id="next-btn" onclick="loadLogs(currentOffset+100)">Next →</button>
+      </div>
+    </div>
+
+    <!-- SESSIONS -->
+    <div class="pane" id="pane-sessions">
+      <div style="display:grid;grid-template-columns:280px 1fr;gap:16px" id="sessions-grid">
+        <div class="card">
+          <div class="ch"><h3>👥 Sessions</h3><button class="btn bs bsm" onclick="loadSessions()">↻</button></div>
+          <div class="cb" style="padding:0">
+            <div class="sess-list" id="sess-list"><div class="loading"><div class="spin"></div>Loading...</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><h3 id="sess-detail-title">Select a session</h3></div>
+          <div class="cb" id="sess-detail"><p style="color:var(--t3);font-size:13px">Click a session to view its messages.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KEYWORDS -->
+    <div class="pane" id="pane-keywords">
+      <div class="card" style="margin-bottom:16px">
+        <div class="ch"><h3>🔍 Keyword Frequency (last 1000 messages)</h3><button class="btn bs bsm" onclick="loadKeywords()">↻ Refresh</button></div>
+        <div class="cb" id="kw-body"><div class="loading"><div class="spin"></div>Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="pane" id="pane-config">
+      <div class="grid">
+        <div class="card">
+          <div class="ch"><h3>✏️ AI Extra Instructions</h3></div>
+          <div class="cb">
+            <div class="f">
+              <label>Extra system instructions (sent with every request)</label>
+              <textarea id="cfg-extra" rows="4" placeholder="e.g. Always mention local NGO contacts. Focus on Mae Sot area."></textarea>
+              <p class="hint">Stored in Supabase. Loaded on page start.</p>
+            </div>
+            <button class="btn bp bsm" onclick="saveCfg('extra_instructions', document.getElementById('cfg-extra').value)">Save</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><h3>📞 Emergency Numbers</h3></div>
+          <div class="cb">
+            <div class="f"><label>🇲🇲 Myanmar Police</label><input id="cfg-em1" value="199"></div>
+            <div class="f"><label>🇹🇭 Thailand Police</label><input id="cfg-em2" value="191"></div>
+            <div class="f"><label>🇹🇭 Anti-Trafficking</label><input id="cfg-em3" value="1300"></div>
+            <div class="f"><label>Custom Hotline</label><input id="cfg-em4" placeholder="+66-XX-XXXXXXX"></div>
+            <button class="btn bp bsm" onclick="saveEmergencyContacts()">Save Contacts</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><h3>🔐 Change Admin Password</h3></div>
+          <div class="cb">
+            <div class="f"><label>New Password</label><input type="password" id="new-pw" placeholder="New admin password"></div>
+            <div class="f"><label>Confirm</label><input type="password" id="new-pw2" placeholder="Confirm new password"></div>
+            <button class="btn bp bsm" onclick="changePw()">Update Password</button>
+            <p class="hint" style="margin-top:8px">Note: This only updates the local stored hash. To change the real server password, update <code>ADMIN_TOKEN</code> in Netlify environment variables.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><h3>🗑️ Data Retention</h3></div>
+          <div class="cb">
+            <div class="f">
+              <label>Delete logs older than</label>
+              <select id="retention-days">
+                <option value="7">7 days</option>
+                <option value="30" selected>30 days</option>
+                <option value="90">90 days</option>
+                <option value="0">All logs</option>
+              </select>
+            </div>
+            <button class="btn bd2 bsm" onclick="confirmDeleteLogs()">🗑 Delete Old Logs</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETUP GUIDE -->
+    <div class="pane" id="pane-setup">
+      <div class="card" style="margin-bottom:20px">
+        <div class="ch"><h3>🚀 Complete Netlify + Supabase Setup Guide</h3></div>
+        <div class="cb">
+          <div class="guide">
+
+            <div class="gs"><div class="gsn">1</div><div class="gsb">
+              <strong>Get Claude API Key</strong>
+              <p>Go to <strong>console.anthropic.com</strong> → API Keys → Create new key. Copy it (starts with <code>sk-ant-...</code>)</p>
+            </div></div>
+
+            <div class="gs"><div class="gsn">2</div><div class="gsb">
+              <strong>Create Supabase Project (Free)</strong>
+              <p>Go to <strong>supabase.com</strong> → New Project → Choose a region close to Thailand (Singapore). Wait ~2 mins for setup.</p>
+            </div></div>
+
+            <div class="gs"><div class="gsn">3</div><div class="gsb">
+              <strong>Run SQL to Create Tables</strong>
+              <p>In Supabase → SQL Editor → paste and run this:</p>
+              <div class="sql-block" id="sql-block">
+<button class="copy-btn" onclick="copySQL()">Copy</button>
+<span class="kw-high">-- Chat logs table</span>
+<span class="kw-str">CREATE TABLE</span> chat_logs (
+  id          <span class="kw-str">BIGSERIAL PRIMARY KEY</span>,
+  session_id  <span class="kw-str">TEXT</span> <span class="kw-high">NOT NULL DEFAULT</span> <span class="kw-num">'anon'</span>,
+  role        <span class="kw-str">TEXT</span> <span class="kw-high">NOT NULL</span>,
+  message     <span class="kw-str">TEXT</span>,
+  ip_hash     <span class="kw-str">TEXT</span>,
+  created_at  <span class="kw-str">TIMESTAMPTZ</span> <span class="kw-high">DEFAULT NOW()</span>
+);
+
+<span class="kw-high">-- Config table</span>
+<span class="kw-str">CREATE TABLE</span> site_config (
+  key         <span class="kw-str">TEXT PRIMARY KEY</span>,
+  value       <span class="kw-str">TEXT</span>,
+  updated_at  <span class="kw-str">TIMESTAMPTZ</span> <span class="kw-high">DEFAULT NOW()</span>
+);
+
+<span class="kw-high">-- Enable Row Level Security</span>
+<span class="kw-str">ALTER TABLE</span> chat_logs <span class="kw-str">ENABLE ROW LEVEL SECURITY</span>;
+<span class="kw-str">ALTER TABLE</span> site_config <span class="kw-str">ENABLE ROW LEVEL SECURITY</span>;
+
+<span class="kw-high">-- Allow service role full access (functions use service key)</span>
+<span class="kw-str">CREATE POLICY</span> <span class="kw-num">"service_all"</span> <span class="kw-str">ON</span> chat_logs
+  <span class="kw-str">FOR ALL USING</span> (<span class="kw-high">true</span>);
+<span class="kw-str">CREATE POLICY</span> <span class="kw-num">"service_all"</span> <span class="kw-str">ON</span> site_config
+  <span class="kw-str">FOR ALL USING</span> (<span class="kw-high">true</span>);
+
+<span class="kw-high">-- Index for fast queries</span>
+<span class="kw-str">CREATE INDEX</span> idx_logs_session <span class="kw-str">ON</span> chat_logs(session_id);
+<span class="kw-str">CREATE INDEX</span> idx_logs_created <span class="kw-str">ON</span> chat_logs(created_at <span class="kw-str">DESC</span>);
+<span class="kw-str">CREATE INDEX</span> idx_logs_role    <span class="kw-str">ON</span> chat_logs(role);
+              </div>
+            </div></div>
+
+            <div class="gs"><div class="gsn">4</div><div class="gsb">
+              <strong>Get Supabase Keys</strong>
+              <p>Supabase → Project Settings → API:<br>
+              Copy <code>Project URL</code> (e.g. <code>https://xxxx.supabase.co</code>)<br>
+              Copy <code>anon / public</code> key (safe to use in serverless functions)</p>
+            </div></div>
+
+            <div class="gs"><div class="gsn">5</div><div class="gsb">
+              <strong>Push to GitHub</strong>
+              <p>Push the full project folder to a new GitHub repo. Make sure <code>netlify/functions/</code>, <code>public/</code>, <code>netlify.toml</code> are all included.</p>
+            </div></div>
+
+            <div class="gs"><div class="gsn">6</div><div class="gsb">
+              <strong>Connect to Netlify</strong>
+              <p>netlify.com → Add new site → Import from GitHub → Select repo → Deploy</p>
+            </div></div>
+
+            <div class="gs"><div class="gsn">7</div><div class="gsb">
+              <strong>Set All Environment Variables</strong>
+              <p>Netlify → Site → Environment variables → Add these 4 variables:</p>
+              <div style="margin-top:8px;background:var(--s2);border-radius:var(--rsm);padding:12px;font-size:12.5px;line-height:2">
+                <strong>ANTHROPIC_API_KEY</strong> = <code>sk-ant-...</code><br>
+                <strong>ADMIN_TOKEN</strong> = <code>YourSecurePassword123!</code><br>
+                <strong>SUPABASE_URL</strong> = <code>https://xxxx.supabase.co</code><br>
+                <strong>SUPABASE_ANON_KEY</strong> = <code>eyJ...</code>
+              </div>
+            </div></div>
+
+            <div class="gs"><div class="gsn">8</div><div class="gsb">
+              <strong>Trigger Redeploy & Test</strong>
+              <p>Netlify → Deploys → Trigger deploy. Your site is live at <code>https://your-site.netlify.app</code>.<br>
+              Test the chat, then check this admin panel — you should see logs appearing in real-time.</p>
+            </div></div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── AUTH ──
+const DEFAULT_PW = 'scamguard-admin-2025';
+let adminToken = null;
+
+function login() {
+  const pw = document.getElementById('pwd').value;
+  const hash = btoa(pw);
+  const stored = localStorage.getItem('sg_pw') || btoa(DEFAULT_PW);
+  if (hash === stored) {
+    adminToken = pw;
+    sessionStorage.setItem('sg_tok', hash);
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('shell').style.display = 'flex';
+    document.getElementById('shell').style.flexDirection = 'column';
+    init();
+  } else {
+    document.getElementById('lerr').style.display = 'block';
+    document.getElementById('pwd').value = '';
+  }
+}
+function logout() { sessionStorage.removeItem('sg_tok'); location.reload(); }
+const saved = sessionStorage.getItem('sg_tok');
+if (saved) {
+  adminToken = atob(saved);
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('shell').style.display = 'flex';
+  document.getElementById('shell').style.flexDirection = 'column';
+  setTimeout(init, 100);
+}
+
+// ── API ──
+async function api(action, extra = {}) {
+  const r = await fetch('/api/admin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken },
+    body: JSON.stringify({ action, ...extra })
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+  return d;
+}
+
+// ── TABS ──
+let currentTab = 'overview';
+const tabLoaded = {};
+function tab(id, el) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('pane-' + id).classList.add('active');
+  el.classList.add('active');
+  currentTab = id;
+  if (!tabLoaded[id]) { tabLoaded[id] = true; loadTab(id); }
+}
+
+function loadTab(id) {
+  if (id === 'logs') loadLogs(0);
+  if (id === 'sessions') loadSessions();
+  if (id === 'keywords') loadKeywords();
+  if (id === 'config') loadConfig();
+}
+
+// ── INIT ──
+function init() { loadOverview(); }
+
+async function loadOverview() {
+  const sbar = document.getElementById('sbar');
+  sbar.innerHTML = '<div class="loading"><div class="spin"></div>Checking status...</div>';
+  try {
+    const d = await api('stats');
+    // Status pills
+    const pills = [];
+    pills.push(`<div class="spill sp-ok"><div class="sp-dot"></div>Authenticated ✓</div>`);
+    pills.push(`<div class="spill ${d.apiConfigured?'sp-ok':'sp-err'}"><div class="sp-dot"></div>${d.apiConfigured ? 'Claude API Connected ✓' : '⚠ ANTHROPIC_API_KEY not set'}</div>`);
+    pills.push(`<div class="spill ${d.supabaseConfigured?'sp-ok':'sp-warn'}"><div class="sp-dot"></div>${d.supabaseConfigured ? 'Supabase Connected ✓' : 'Supabase not configured'}</div>`);
+    pills.push(`<div class="spill sp-info"><div class="sp-dot"></div>Model: ${d.model}</div>`);
+    pills.push(`<div style="margin-left:auto;font-size:11.5px;color:var(--t3)">${new Date(d.timestamp).toLocaleString()}</div>`);
+    sbar.innerHTML = pills.join('');
+
+    // Stats
+    document.getElementById('st-msgs').textContent = fmtNum(d.totalMessages);
+    document.getElementById('st-sess').textContent = fmtNum(d.totalSessions);
+    document.getElementById('st-24h').textContent = fmtNum(d.messagesLast24h);
+    document.getElementById('st-err').textContent = fmtNum(d.errorsToday);
+
+    // API card
+    document.getElementById('api-card').innerHTML = d.apiConfigured
+      ? `<div class="spill sp-ok" style="display:inline-flex;margin-bottom:10px"><div class="sp-dot"></div>Connected</div>
+         <p style="font-size:12.5px;color:var(--t2);line-height:1.6">Claude Sonnet 4 is active. All chat requests are being proxied securely through the Netlify serverless function.</p>`
+      : `<div class="spill sp-err" style="display:inline-flex;margin-bottom:10px"><div class="sp-dot"></div>Not configured</div>
+         <p style="font-size:12.5px;color:var(--dt);line-height:1.6">Add <strong>ANTHROPIC_API_KEY</strong> to Netlify → Site → Environment variables, then redeploy.</p>`;
+
+    // DB card
+    document.getElementById('db-card').innerHTML = d.supabaseConfigured
+      ? `<div class="spill sp-ok" style="display:inline-flex;margin-bottom:10px"><div class="sp-dot"></div>Connected</div>
+         <p style="font-size:12.5px;color:var(--t2);line-height:1.6">Supabase is active. Chat logs are being stored persistently. ${fmtNum(d.totalMessages)} total messages recorded.</p>`
+      : `<div class="spill sp-warn" style="display:inline-flex;margin-bottom:10px"><div class="sp-dot"></div>Not configured</div>
+         <p style="font-size:12.5px;color:var(--wt);line-height:1.6">Add <strong>SUPABASE_URL</strong> and <strong>SUPABASE_ANON_KEY</strong> to Netlify env vars. See Setup Guide tab.</p>`;
+  } catch(e) {
+    sbar.innerHTML = `<div class="spill sp-warn"><div class="sp-dot"></div>Running locally — functions not available (${e.message})</div>`;
+  }
+}
+
+// ── LOGS ──
+let currentOffset = 0;
+let searchTimer = null;
+function debouncedSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadLogs(0), 400); }
+
+async function loadLogs(offset = 0) {
+  currentOffset = Math.max(0, offset);
+  const wrap = document.getElementById('logs-wrap');
+  wrap.innerHTML = '<div class="loading"><div class="spin"></div>Loading logs...</div>';
+  try {
+    const d = await api('getLogs', {
+      limit: 100, offset: currentOffset,
+      role: document.getElementById('role-filter').value || null,
+      search: document.getElementById('search-input').value || null,
+      session: document.getElementById('session-filter').value || null
+    });
+    if (!d.supabaseConfigured) {
+      wrap.innerHTML = `<div style="padding:20px;color:var(--t3);font-size:13px;text-align:center">Supabase not configured. Set up Supabase to enable persistent log storage. See the Setup Guide tab.</div>`;
+      document.getElementById('pagination').style.display = 'none';
+      return;
+    }
+    if (!d.logs.length) {
+      wrap.innerHTML = `<div style="padding:20px;color:var(--t3);font-size:13px;text-align:center">No logs found${document.getElementById('search-input').value ? ' matching "' + esc(document.getElementById('search-input').value) + '"' : ''}.</div>`;
+      document.getElementById('pagination').style.display = 'none';
+      return;
+    }
+    renderLogsTable(d.logs);
+    const pag = document.getElementById('pagination');
+    pag.style.display = 'flex';
+    document.getElementById('prev-btn').disabled = currentOffset === 0;
+    document.getElementById('next-btn').disabled = d.logs.length < 100;
+    document.getElementById('page-info').textContent = `Showing ${currentOffset + 1}–${currentOffset + d.logs.length}`;
+  } catch(e) {
+    wrap.innerHTML = `<div style="padding:16px;color:var(--dt);font-size:13px">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderLogsTable(logs) {
+  const wrap = document.getElementById('logs-wrap');
+  const rows = logs.map(l => {
+    const cls = l.role === 'user' ? 'r-user' : l.role === 'error' ? 'r-err' : 'r-bot';
+    const label = l.role === 'user' ? 'User' : l.role === 'error' ? 'Error' : 'AI';
+    const ts = new Date(l.created_at).toLocaleString();
+    const sid = (l.session_id || '').slice(0, 12);
+    const msg = esc(l.message || '').slice(0, 300) + (l.message?.length > 300 ? '…' : '');
+    return `<tr>
+      <td style="white-space:nowrap;color:var(--t3)">${ts}</td>
+      <td><span class="rpill ${cls}">${label}</span></td>
+      <td style="color:var(--t3);font-size:11.5px" title="${esc(l.session_id||'')}"><code>${sid}</code></td>
+      <td class="msg-cell">${msg}</td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<div class="tbl-wrap"><table>
+    <thead><tr><th>Time</th><th>Role</th><th>Session</th><th>Message</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+async function exportLogs() {
+  try {
+    const d = await api('getLogs', { limit: 500, offset: 0,
+      role: document.getElementById('role-filter').value || null,
+      search: document.getElementById('search-input').value || null });
+    if (!d.supabaseConfigured) { toast('Supabase not configured'); return; }
+    const csv = ['Time,Role,Session,Message']
+      .concat((d.logs||[]).map(l =>
+        `"${l.created_at}","${l.role}","${l.session_id||''}","${(l.message||'').replace(/"/g,'""')}"`
+      )).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = 'scamguard-logs-' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    toast('✓ Exported ' + d.logs.length + ' rows');
+  } catch(e) { toast('Export error: ' + e.message); }
+}
+
+// ── SESSIONS ──
+async function loadSessions() {
+  document.getElementById('sess-list').innerHTML = '<div class="loading"><div class="spin"></div>Loading...</div>';
+  try {
+    const d = await api('getSessions');
+    if (!d.sessions.length) {
+      document.getElementById('sess-list').innerHTML = '<p style="padding:16px;color:var(--t3);font-size:13px">No sessions yet.</p>';
+      return;
+    }
+    document.getElementById('sess-list').innerHTML = d.sessions.map(s =>
+      `<div class="sess-item" onclick="viewSession('${esc(s.session_id)}',this)">
+        <div class="sess-icon">💬</div>
+        <div class="sess-info">
+          <strong>${esc(s.session_id.slice(0,16))}</strong>
+          <span>${new Date(s.last_active).toLocaleString()}</span>
+        </div>
+        <span class="sess-badge">${s.count}</span>
+      </div>`
+    ).join('');
+  } catch(e) { document.getElementById('sess-list').innerHTML = `<p style="padding:16px;color:var(--dt);font-size:13px">Error: ${esc(e.message)}</p>`; }
+}
+
+async function viewSession(sid, el) {
+  document.querySelectorAll('.sess-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('sess-detail-title').textContent = 'Session: ' + sid.slice(0,16);
+  document.getElementById('sess-detail').innerHTML = '<div class="loading"><div class="spin"></div>Loading...</div>';
+  try {
+    const d = await api('getLogs', { limit: 200, offset: 0, session: sid });
+    if (!d.logs.length) { document.getElementById('sess-detail').innerHTML = '<p style="color:var(--t3);font-size:13px">No messages.</p>'; return; }
+    const msgs = d.logs.slice().reverse().map(l => {
+      const cls = l.role === 'user' ? 'r-user' : l.role === 'error' ? 'r-err' : 'r-bot';
+      return `<div style="margin-bottom:10px;padding:9px 13px;background:${l.role==='user'?'var(--ibg)':'var(--sbg)'};border-radius:10px">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:3px"><span class="rpill ${cls}">${l.role}</span> &nbsp;${new Date(l.created_at).toLocaleString()}</div>
+        <div style="font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word">${esc(l.message||'')}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('sess-detail').innerHTML = `<div style="max-height:500px;overflow-y:auto;padding-right:4px">${msgs}</div>`;
+  } catch(e) { document.getElementById('sess-detail').innerHTML = `<p style="color:var(--dt);font-size:13px">Error: ${esc(e.message)}</p>`; }
+}
+
+// ── KEYWORDS ──
+async function loadKeywords() {
+  document.getElementById('kw-body').innerHTML = '<div class="loading"><div class="spin"></div>Loading...</div>';
+  try {
+    const d = await api('keywordStats');
+    const kws = d.keywords;
+    const max = Math.max(...Object.values(kws), 1);
+    const rows = Object.entries(kws).map(([k,v]) =>
+      `<div class="kw-row">
+        <div class="kw-label">${esc(k)}</div>
+        <div class="kw-bar-wrap"><div class="kw-bar" style="width:${Math.round(v/max*100)}%"></div></div>
+        <div class="kw-count">${v}</div>
+      </div>`
+    ).join('');
+    document.getElementById('kw-body').innerHTML = `<div class="kw-list">${rows}</div>
+      <p style="font-size:12px;color:var(--t3);margin-top:12px">Based on last 1,000 user messages. ${d.supabaseConfigured===false ? '⚠ Supabase not configured — no data available.' : ''}</p>`;
+  } catch(e) { document.getElementById('kw-body').innerHTML = `<p style="color:var(--dt);font-size:13px">Error: ${esc(e.message)}</p>`; }
+}
+
+// ── CONFIG ──
+async function loadConfig() {
+  try {
+    const d = await api('getConfig');
+    const c = d.config;
+    if (c.extra_instructions) document.getElementById('cfg-extra').value = c.extra_instructions;
+    if (c.emergency) {
+      const em = c.emergency;
+      if (em.em1) document.getElementById('cfg-em1').value = em.em1;
+      if (em.em2) document.getElementById('cfg-em2').value = em.em2;
+      if (em.em3) document.getElementById('cfg-em3').value = em.em3;
+      if (em.em4) document.getElementById('cfg-em4').value = em.em4 || '';
+    }
+  } catch(e) { toast('Config load: ' + e.message); }
+}
+
+async function saveCfg(key, value) {
+  try { await api('saveConfig', { key, value }); toast('✓ Saved: ' + key); } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function saveEmergencyContacts() {
+  const em = { em1: document.getElementById('cfg-em1').value, em2: document.getElementById('cfg-em2').value, em3: document.getElementById('cfg-em3').value, em4: document.getElementById('cfg-em4').value };
+  await saveCfg('emergency', em);
+}
+
+function changePw() {
+  const pw = document.getElementById('new-pw').value;
+  const pw2 = document.getElementById('new-pw2').value;
+  if (!pw) { toast('Enter a new password'); return; }
+  if (pw !== pw2) { toast('Passwords do not match'); return; }
+  if (pw.length < 8) { toast('Password must be at least 8 characters'); return; }
+  localStorage.setItem('sg_pw', btoa(pw));
+  adminToken = pw;
+  sessionStorage.setItem('sg_tok', btoa(pw));
+  document.getElementById('new-pw').value = '';
+  document.getElementById('new-pw2').value = '';
+  toast('✓ Password updated (local only — also update ADMIN_TOKEN in Netlify)');
+}
+
+// ── DELETE LOGS ──
+function confirmDeleteLogs() {
+  const days = parseInt(document.getElementById('retention-days')?.value || '30');
+  const msg = days === 0 ? 'Delete ALL chat logs?' : `Delete logs older than ${days} days?`;
+  if (!confirm(msg + '\n\nThis cannot be undone.')) return;
+  const olderThan = days === 0 ? null : new Date(Date.now() - days * 86400000).toISOString();
+  api('deleteLogs', { olderThan }).then(() => { toast('✓ Logs deleted'); loadOverview(); }).catch(e => toast('Error: ' + e.message));
+}
+
+// ── SQL COPY ──
+function copySQL() {
+  const text = `-- Chat logs table
+CREATE TABLE chat_logs (
+  id          BIGSERIAL PRIMARY KEY,
+  session_id  TEXT NOT NULL DEFAULT 'anon',
+  role        TEXT NOT NULL,
+  message     TEXT,
+  ip_hash     TEXT,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Config table
+CREATE TABLE site_config (
+  key         TEXT PRIMARY KEY,
+  value       TEXT,
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE chat_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE site_config ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "service_all" ON chat_logs FOR ALL USING (true);
+CREATE POLICY "service_all" ON site_config FOR ALL USING (true);
+
+CREATE INDEX idx_logs_session ON chat_logs(session_id);
+CREATE INDEX idx_logs_created ON chat_logs(created_at DESC);
+CREATE INDEX idx_logs_role    ON chat_logs(role);`;
+  navigator.clipboard.writeText(text).then(() => toast('✓ SQL copied to clipboard')).catch(() => toast('Copy failed — select manually'));
+}
+
+// ── HELPERS ──
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtNum(n) { return n == null ? '–' : Number(n).toLocaleString(); }
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>

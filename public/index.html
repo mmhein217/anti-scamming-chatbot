@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Scam Guard AI · စကမ်းကာကွယ်</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#7C3626;--brand-d:#5A2518;--brand-l:#F9F0EB;
+  --bg:#F5EFE8;--surface:#FFFFFF;--surface2:#F3EDE7;
+  --border:rgba(124,54,38,0.13);--border2:rgba(124,54,38,0.22);
+  --text:#1A0D06;--text2:#6B3E2A;--text3:#9A7060;
+  --warn-bg:#FFFBEB;--warn-b:#F59E0B;--warn-t:#78350F;
+  --danger-bg:#FEF2F2;--danger-b:#E24B4A;--danger-t:#7F1D1D;
+  --font:'Plus Jakarta Sans','Noto Sans Myanmar',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text)}
+.shell{display:flex;flex-direction:column;height:100dvh;max-width:800px;margin:0 auto;background:var(--surface);box-shadow:0 0 40px rgba(0,0,0,.08)}
+.hdr{background:var(--brand);padding:12px 16px;display:flex;align-items:center;gap:11px;flex-shrink:0}
+.hdr-shield{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.hdr-info h1{color:#fff;font-size:15px;font-weight:700;line-height:1.2}
+.hdr-info p{color:rgba(255,255,255,.6);font-size:11px;margin-top:1px}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.online-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.8)}
+.online-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#4ade80;display:block;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.admin-link{color:rgba(255,255,255,.5);font-size:11px;text-decoration:none;padding:4px 9px;border-radius:6px;border:0.5px solid rgba(255,255,255,.2)}
+.admin-link:hover{background:rgba(255,255,255,.12);color:#fff}
+.banner{background:var(--warn-bg);border-bottom:0.5px solid var(--warn-b);padding:7px 14px;font-size:12px;color:var(--warn-t);line-height:1.5;flex-shrink:0}
+.chips-wrap{padding:9px 12px;overflow-x:auto;border-bottom:0.5px solid var(--border);background:var(--surface2);flex-shrink:0;-webkit-overflow-scrolling:touch}
+.chips-wrap::-webkit-scrollbar{display:none}
+.chips-inner{display:flex;gap:7px;width:max-content}
+.chip{white-space:nowrap;font-size:12px;padding:6px 13px;border-radius:20px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;font-family:var(--font);transition:all .15s}
+.chip:active,.chip:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-l)}
+.msgs{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.msgs::-webkit-scrollbar{width:3px}
+.msgs::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.row{display:flex;gap:8px;max-width:93%;animation:rise .2s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.row.b{align-self:flex-start}
+.row.u{align-self:flex-end;flex-direction:row-reverse}
+.mav{width:30px;height:30px;border-radius:50%;background:var(--brand);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:3px}
+.row.u .mav{background:#475569}
+.bbl{padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.9;word-break:break-word;white-space:pre-wrap}
+.row.b .bbl{background:var(--surface2);color:var(--text);border-bottom-left-radius:3px;border:0.5px solid var(--border2)}
+.row.u .bbl{background:var(--brand);color:#fff;border-bottom-right-radius:3px}
+.bbl strong{font-weight:700}
+.typing-r{display:flex;gap:8px;align-self:flex-start}
+.typing-bbl{background:var(--surface2);border:0.5px solid var(--border2);border-radius:16px;border-bottom-left-radius:3px;padding:12px 16px}
+.dots{display:flex;gap:4px;align-items:center}
+.dots span{width:5px;height:5px;border-radius:50%;background:var(--text3);animation:bop 1s infinite}
+.dots span:nth-child(2){animation-delay:.18s}
+.dots span:nth-child(3){animation-delay:.36s}
+@keyframes bop{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+.input-row{flex-shrink:0;padding:10px 12px;border-top:0.5px solid var(--border);background:var(--surface);display:flex;align-items:flex-end;gap:9px}
+.inp-box{flex:1;background:var(--surface2);border:0.5px solid var(--border2);border-radius:22px;padding:0 14px;transition:border-color .15s;display:flex;align-items:flex-end}
+.inp-box:focus-within{border-color:var(--brand)}
+textarea{flex:1;border:none;background:transparent;padding:10px 0;font-size:14px;resize:none;outline:none;font-family:var(--font);color:var(--text);line-height:1.65;min-height:40px;max-height:120px}
+textarea::placeholder{color:var(--text3)}
+.send-btn{width:40px;height:40px;min-width:40px;border-radius:50%;background:var(--brand);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s,transform .1s}
+.send-btn:active{transform:scale(.93)}
+.send-btn:hover{opacity:.85}
+.send-btn:disabled{opacity:.3;cursor:not-allowed}
+.em-bar{background:var(--danger-bg);border-top:0.5px solid var(--danger-b);padding:7px 12px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;flex-shrink:0}
+.em-bar span{font-size:11.5px;color:var(--danger-t);font-weight:700}
+.em-btn{font-size:12px;font-weight:700;padding:4px 11px;border-radius:20px;text-decoration:none;color:#fff;transition:opacity .15s}
+.em-btn:hover{opacity:.85}
+.em-my{background:var(--brand)}
+.em-th{background:#1565C0}
+.em-anti{background:#D84315}
+@media(max-width:480px){
+  .hdr-info p{display:none}
+  .bbl{font-size:13.5px;line-height:1.85}
+  textarea{font-size:13.5px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="hdr">
+    <div class="hdr-shield">🛡️</div>
+    <div class="hdr-info">
+      <h1>Scam Guard AI · စကမ်းကာကွယ်</h1>
+      <p>နယ်စပ်ဒေသ Anti-Scam · Claude AI Powered</p>
+    </div>
+    <div class="hdr-right">
+      <div class="online-badge" id="status">Online</div>
+      <a href="admin.html" class="admin-link">⚙ Admin</a>
+    </div>
+  </div>
+
+  <div class="banner">⚠️ ဤ chatbot သည် awareness ရည်ရွယ်ချက်သာဖြစ်သည်။ Scam ဖြစ်ပါက ဘဏ်ကိုချက်ချင်းဆက်သွယ်ပြီး ရဲ 199 / 191 တိုင်ပင်ပါ။</div>
+
+  <div class="chips-wrap">
+    <div class="chips-inner">
+      <button class="chip" onclick="q('KK Park မြဝတီ scam compound တွေ ဘာကြောင့် ဆိုးတာလဲ?')">🏗️ KK Park</button>
+      <button class="chip" onclick="q('တရုတ် ကျောဟြာ ဂိုဏ်းများ မြန်မာပြည်မှာ ဘယ်လိုလုပ်ကိုင်တာလဲ?')">🇨🇳 တရုတ်ဂိုဏ်း</button>
+      <button class="chip" onclick="q('ကျားဖြန် ဆိုတာ ဘာလဲ? ဘယ်လို ကာကွယ်မလဲ?')">⛓️ ကျားဖြန်</button>
+      <button class="chip" onclick="q('Pig butchering scam ဘယ်လို အလုပ်လုပ်သလဲ?')">🐷 Pig Butchering</button>
+      <button class="chip" onclick="q('Love scam မှ ဘယ်လို ကာကွယ်မလဲ?')">💔 Love Scam</button>
+      <button class="chip" onclick="q('Telegram job offer ရတယ်၊ scam စစ်ဆေးနည်း ပြောပေးပါ')">💼 Job Scam</button>
+      <button class="chip" onclick="q('Crypto investment scam ဘယ်လို သိနိုင်မလဲ?')">🪙 Crypto</button>
+      <button class="chip" onclick="q('AI deepfake scam 2025 ဘာဆိုးသလဲ?')">🤖 Deepfake</button>
+      <button class="chip" onclick="q('Scam ဖြစ်ခဲ့ပြီ ဘာလုပ်ရမလဲ?')">🆘 ကူညီပါ</button>
+    </div>
+  </div>
+
+  <div class="msgs" id="msgs"></div>
+
+  <div class="input-row">
+    <div class="inp-box">
+      <textarea id="inp" placeholder="မြန်မာဘာသာ သို့မဟုတ် English ဖြင့် မေးပါ..." rows="1"
+        onkeydown="onKey(event)" oninput="grow(this)"></textarea>
+    </div>
+    <button class="send-btn" id="sbtn" onclick="send()" aria-label="Send">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="em-bar">
+    <span>🚨 Emergency:</span>
+    <a href="tel:199" class="em-btn em-my">🇲🇲 199</a>
+    <a href="tel:191" class="em-btn em-th">🇹🇭 191</a>
+    <a href="tel:1300" class="em-btn em-anti">1300</a>
+  </div>
+</div>
+
+<script>
+const msgsEl=document.getElementById('msgs'),inpEl=document.getElementById('inp'),sbtnEl=document.getElementById('sbtn');
+let history=[],busy=false;
+const sessionId = 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
+
+function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function fmt(t){return esc(t).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}
+
+function addMsg(text,who){
+  const d=document.createElement('div');
+  d.className='row '+who;
+  d.innerHTML=(who==='b'?'<div class="mav">🛡️</div>':'')+
+    '<div class="bbl">'+fmt(text)+'</div>'+
+    (who==='u'?'<div class="mav">👤</div>':'');
+  msgsEl.appendChild(d);
+  requestAnimationFrame(()=>{msgsEl.scrollTop=msgsEl.scrollHeight+300});
+}
+
+function showTyping(){
+  const d=document.createElement('div');
+  d.className='typing-r';d.id='typ';
+  d.innerHTML='<div class="mav">🛡️</div><div class="typing-bbl"><div class="dots"><span></span><span></span><span></span></div></div>';
+  msgsEl.appendChild(d);
+  requestAnimationFrame(()=>{msgsEl.scrollTop=msgsEl.scrollHeight+300});
+}
+function removeTyping(){document.getElementById('typ')?.remove()}
+
+async function callAPI(text){
+  history.push({role:'user',content:text});
+  appendLog('user',text);
+  const sliced=history.slice(-20);
+  const r=await fetch('/api/chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({messages:sliced,sessionId})
+  });
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||'HTTP '+r.status)}
+  const d=await r.json();
+  history.push({role:'assistant',content:d.reply});
+  appendLog('bot',d.reply);
+  return d.reply;
+}
+
+async function send(){
+  const text=inpEl.value.trim();
+  if(!text||busy)return;
+  inpEl.value='';grow(inpEl);
+  addMsg(text,'u');busy=true;sbtnEl.disabled=true;
+  showTyping();
+  try{
+    const reply=await callAPI(text);
+    removeTyping();addMsg(reply,'b');
+  }catch(e){
+    removeTyping();
+    appendLog('error',e.message);
+    addMsg('ဆောင်ရွက်မရပါ။\n\nဖြစ်နိုင်သည့် အကြောင်းရင်းများ:\n• Internet connection စစ်ဆေးပါ\n• Admin panel တွင် API key ထည့်ထားမထားကို စစ်ဆေးပါ\n\nError: '+e.message,'b');
+  }
+  busy=false;sbtnEl.disabled=false;
+}
+
+function q(t){inpEl.value=t;send()}
+function onKey(e){if(e.key==='Enter'&&!e.shiftKey&&window.innerWidth>600){e.preventDefault();send()}}
+function grow(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px'}
+
+setTimeout(()=>addMsg('မင်္ဂလာပါ 🛡️\n\nကျွန်ုပ်သည် **Scam Guard AI** ဖြစ်ပါသည်။ Claude AI နှင့် ချိတ်ဆက်ထားပြီး မြန်မာဘာသာဖြင့် ပြည့်ဝစွာ ဖြေဆိုပေးနိုင်ပါသည်။\n\nနယ်စပ်ဒေသ မဲဆောက်-မြဝတီ၊ KK Park၊ တရုတ်ကျောဟြာ ဂိုဏ်းများ၊ ကျားဖြန်၊ Pig Butchering Scam၊ Love/Job/Crypto Scam — မေးချင်သမျှ မေးနိုင်ပါသည်။\n\n• မြန်မာဘာသာ ✓\n• English ✓\n• Scam ဖြစ်ခဲ့ပြီဆိုလည်း ကူညီပေးနိုင် ✓','b'),300);
+
+// ── LOG to localStorage (admin can read) ──
+const LOG_KEY='sg_log';
+function appendLog(role,text){
+  try{
+    const log=JSON.parse(localStorage.getItem(LOG_KEY)||'[]');
+    log.push({ts:new Date().toLocaleTimeString(),role,text});
+    if(log.length>200)log.splice(0,log.length-200);
+    localStorage.setItem(LOG_KEY,JSON.stringify(log));
+  }catch(e){}
+}
+</script>
+</body>
+</html>
+<!-- log bridge injected -->

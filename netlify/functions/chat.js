@@ -297,22 +297,6 @@ exports.handler = async function(event) {
     return { statusCode: 200, headers, body: JSON.stringify({ reply: piiWarning, cached: true }) };
   }
 
-  // ── GUARD 3: Supabase cached answers
-  if (supabaseUrl && supabaseKey) {
-    const hit = matchCachedAnswer(cachedList, userMessage);
-    if (hit) {
-      incrementCacheHit(supabaseUrl, supabaseKey, hit.id);
-      await logToSupabase(supabaseUrl, supabaseKey, {
-        session_id: sessionId || 'anon',
-        role: 'cached',
-        message: `[${hit.question}] ${hit.answer.slice(0, 1950)}`,
-        ip_hash: ipHash,
-        created_at: new Date().toISOString()
-      });
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: hit.answer, cached: true }) };
-    }
-  }
-
   // ── RAG: DB match → build context for AI (not direct answer)
   const dbMatch = matchScamTopic(scamTopicsData, userMessage);
   let ragContext = '';
@@ -422,14 +406,18 @@ Scam နှင့် ပတ်သက်သောအရေးပေါ်ကိ�
         session_id: sessionId || 'anon', role: 'error',
         message: `Groq failed (${MODELS.join(',')}), status: ${lastStatus}`, ip_hash: ipHash, created_at: new Date().toISOString()
       });
-      const fallback = dbFallbackReply || FALLBACK_REPLY;
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: fallback, cached: true, source: dbFallbackReply ? 'db_fallback' : 'static' }) };
+      const cachedHit = matchCachedAnswer(cachedList, userMessage);
+      if (cachedHit) { incrementCacheHit(supabaseUrl, supabaseKey, cachedHit.id); }
+      const fallback = cachedHit?.answer || dbFallbackReply || FALLBACK_REPLY;
+      return { statusCode: 200, headers, body: JSON.stringify({ reply: fallback, cached: true }) };
     }
 
     let reply = data.choices?.[0]?.message?.content || '';
     if (!reply.trim()) {
-      const fallback = dbFallbackReply || FALLBACK_REPLY;
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: fallback, cached: true, source: dbFallbackReply ? 'db_fallback' : 'static' }) };
+      const cachedHit = matchCachedAnswer(cachedList, userMessage);
+      if (cachedHit) { incrementCacheHit(supabaseUrl, supabaseKey, cachedHit.id); }
+      const fallback = cachedHit?.answer || dbFallbackReply || FALLBACK_REPLY;
+      return { statusCode: 200, headers, body: JSON.stringify({ reply: fallback, cached: true }) };
     }
 
     reply = ensureGoldenRule(reply);

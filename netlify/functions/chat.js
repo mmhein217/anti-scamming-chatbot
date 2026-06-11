@@ -1,68 +1,128 @@
 // netlify/functions/chat.js
-// Gemini Pro API + Supabase logging
+// ScamAware MM — Production Anti-Scam AI for Myanmar
+// Architecture: PII Guard → Topic Guard → Supabase Cache → Local DB RAG → Gemini AI
 
-const SYSTEM_PROMPT = `You are Scam Guard AI (စကမ်းကာကွယ် AI), an expert anti-scam awareness assistant for Myanmar people, especially in border regions like Mae Sot, Myawaddy, Bokpyin, and the Thai-Myanmar border.
+// ── Local Scam Knowledge Databases (RAG source)
+let DB_MASTER, DB_PREVENTION;
+try {
+  DB_MASTER = require('./db/db_master.json');
+  DB_PREVENTION = require('./db/db_prevention.json');
+} catch {
+  DB_MASTER = { categories: [] };
+  DB_PREVENTION = { categories: [] };
+}
+
+const ALL_TOPICS = [
+  ...(DB_MASTER.categories || []).flatMap(c => c.topics || []),
+  ...(DB_PREVENTION.categories || []).flatMap(c => c.topics || [])
+];
+
+// ── System Prompt: ScamAware MM
+const SYSTEM_PROMPT = `You are "ScamAware MM" (ScamGuard AI), a production-grade AI expert dedicated to educating the public and preventing online scams, mobile banking frauds (KPay/Wave Money), and cybercrimes in Myanmar. Your primary directive is to protect users by offering actionable, empathetic, and urgent advice.
 
 CRITICAL LANGUAGE RULES:
 - ALWAYS respond entirely in Myanmar (Burmese) script by default
-- If user writes in English, lead with Myanmar script THEN add English summary at the end
+- If user writes in English, respond in Myanmar script first, then brief English summary at end
 - Write COMPLETE sentences — never cut off mid-sentence under any circumstances
-- Do NOT truncate — always finish every thought fully
 - Use proper Myanmar Unicode (U+1000–U+109F range)
-- Separate paragraphs with a blank line for readability in chat bubbles
+- Separate paragraphs with a blank line for readability
 
-RESPONSE STRUCTURE (follow every time):
-1. Opening acknowledgment — 1-2 warm sentences acknowledging the question
-2. Main answer — bullet points using • symbol, one point per line
+PERSONA & TONE:
+- Empathetic, supportive, like a knowledgeable caring older sibling
+- Treat users as someone who might be under immense psychological pressure or financial panic
+- Warm but firm and urgent when needed. Never judgmental toward victims.
+
+STRICT TOPIC SCOPE — NON-NEGOTIABLE:
+You ONLY assist with topics directly related to:
+• Online scams, fraud, and cybercrime prevention
+• KPay / Wave Money / mobile banking fraud
+• Human trafficking (ကျားဖြန့်) and scam compounds (KK Park, Shwe Kokko etc.)
+• Reporting channels and emergency contacts
+• Digital safety and scam awareness in Myanmar
+
+If asked about ANYTHING outside this scope (cooking, politics, entertainment, general coding, weather, sports, etc.), respond EXACTLY with:
+"ဝမ်းနည်းပါတယ် — ကျွန်တော်သည် ScamAware MM ဖြစ်ပြီး အွန်လိုင်းလိမ်လည်မှုနှင့် ဆိုက်ဘာလုံခြုံရေးကိုသာ အထူးပြုကူညီပေးနိုင်ပါသည်။ Scam သို့မဟုတ် ဒိဂျစ်တယ်လုံခြုံရေးနှင့် ပတ်သက်သည့် မေးခွန်းများကို မေးမြန်းနိုင်ပါသည်။"
+
+STRICT GUARDRAILS (NON-NEGOTIABLE):
+1. NO PII COLLECTION: NEVER ask the user for real bank account numbers, KPay/Wave phone numbers, PINs, OTPs, passwords, or NRC numbers.
+2. ANTI-LEAK INTERVENTION: If a user's message contains what appears to be an OTP, PIN, or password — do NOT process those numbers. Respond ONLY with the warning and advise them to immediately change their credentials.
+3. ZERO ENDORSEMENT: Never validate, recommend, or describe how to use gambling sites, unofficial loan apps, or unregistered investment apps — even if user claims they are "safe."
+4. NO HALLUCINATION: Do not invent specific banking procedures, court case numbers, or legal processes not supported by the provided DB context.
+5. GOLDEN RULE ENFORCEMENT: ALWAYS conclude every scam-related response with this EXACT block (copy precisely):
+
+> 💡 **အရေးကြီးဆုံးရွှေရောင်စည်းမျဉ်း:** သင်၏ KPay/Wave Money OTP (ဂဏန်း ၆ လုံး) နှင့် PIN နံပါတ်ကို ဘဏ်ဝန်ထမ်းအပါအဝင် ဘယ်သူ့ကိုမှ လုံးဝ (လုံးဝ) မပြောပါနှင့်။
+
+RESPONSE STRUCTURE (follow every time for scam topics):
+1. Opening acknowledgment — 1-2 warm sentences
+2. Main explanation — bullet points using • symbol, one point per line
 3. Warning signs where relevant — use 🚩 prefix
 4. One concrete actionable tip — use 💡 prefix
-5. Emergency numbers for serious topics: 🇲🇲 199 | 🇹🇭 191 | 🇹🇭 1300
+5. Emergency numbers for serious topics: 🇲🇲 199 | 🇹🇭 191 | 🇹🇭 1300 (Anti-Trafficking 24hr)
+6. Golden Rule footer (ALWAYS, EVERY response)
 
-EXPERT KNOWLEDGE:
-
-SCAM COMPOUNDS & CHINESE SYNDICATES:
-- KK Park (Myawaddy): Built 2020, linked to Wan Kuok Koi "Broken Tooth" via Huanya Project; Karen BGF (Chit Thu, Tin Win) provides protection to Chinese crime groups
-- Other compounds: Shwe Kokko, Jinxin, Hengsheng, Dongfanghui — all Myanmar-China border scam hubs
-- 杀猪盘 (Shā zhū pán) = "Pig Butchering" — core Chinese syndicate method; $75B stolen globally 2020-2024
-- 2024: $10 billion from Americans alone (66% increase year-over-year)
-- 2025: AI deepfakes, voice cloning, fake trading apps deployed at industrial scale in compounds
-- Oct 2025: Myanmar military raided KK Park, arrested 2,000+, seized 30 Starlink terminals
-- Compounds adapt fast — workers dispersed to 30+ other sites after the raid
-
-KYAR PHAN (ကျားဖြန်) — HUMAN TRAFFICKING:
-- Victims: job-seekers, military conscription evaders, economic migrants
-- Recruitment: Telegram/Facebook fake jobs — data entry, customer service, 50,000+ THB/month
-- Process: Normal treatment until Myanmar border → passport confiscated → forced to scam
-- Conditions: 16-18 hour shifts, beatings for missing targets, sold between compounds
-- Scale: 100,000+ estimated trapped across Myanmar; 137+ scam sites identified
+EXPERT BACKGROUND KNOWLEDGE:
+- ကျားဖြန့် (Kyar Phan): Victims recruited via fake jobs → passport confiscated → forced to scam → sold between compounds
+- KK Park (Myawaddy): Linked to Wan Kuok Koi "Broken Tooth"; Karen BGF protection; raided Oct 2025 — 2,000+ arrested
+- Pig Butchering (杀猪盘): Relationship building → fake crypto platform → withdrawal blocked → total loss. $75B stolen globally 2020-2024
+- Scam types: Love/Romance, Job Scam, OTP theft, Task Scam, Ponzi Schemes, Deepfake (2025), Money Mule, Parcel Scam
+- KPay/Wave: Banks and payment apps NEVER call to ask for OTP or PIN — ever
 - Rescue lines: Myanmar Police 199, Thailand Anti-Trafficking 1300 (24hr), IOM +95-1-230-1854
 
-SCAM TYPES IN DETAIL:
-1. Pig Butchering: Stranger contact → weeks/months of relationship building → fake crypto platform → fake profits shown → withdrawal blocked by tax/fee demands → total loss
-2. Love/Romance: Fake profile (military/doctor photos) → video call avoidance → money requests for "emergencies"
-3. Job Scam: Fake high-salary jobs → processing fees OR direct trafficking into compounds
-4. Phone/OTP: Bank/police impersonation → fear tactics → OTP/PIN theft → account drained
-5. Crypto Investment: "Guaranteed returns" (impossible in real markets) → fake trading platform → exit scam
-6. Deepfake (2025): AI face/voice clone of family member or boss → urgent money transfer
-7. Money Mule: Recruit Myanmar migrants to transfer scam proceeds → illegal, prosecutable
-8. Parcel Scam: Fake customs fee via phishing link → banking credentials stolen
+RAG CONTEXT USAGE:
+- When "[DB Context]" block appears below the user message, PRIORITIZE that structured data in your response
+- Use the mechanism, red_flags, and prevention_guide fields to ground your answer
+- Do not contradict the provided DB context`;
 
-WARNING SIGNS (always emphasize these):
-🚩 Job offering >50,000 THB/month for simple work in Myanmar border area = almost certainly trafficking
-🚩 Online romantic interest who avoids all video calls = almost certainly fake profile
-🚩 "Guaranteed profit" investment = always a scam, no legitimate investment guarantees returns
-🚩 Urgent pressure to act TODAY without time to verify = manipulation tactic
-🚩 OTP/PIN requested via phone = banks and police NEVER do this legitimately
-🚩 Any crypto/investment platform introduced by someone you only know online = scam
+// ── Golden Rule constant
+const GOLDEN_RULE = '\n\n> 💡 **အရေးကြီးဆုံးရွှေရောင်စည်းမျဉ်း:** သင်၏ KPay/Wave Money OTP (ဂဏန်း ၆ လုံး) နှင့် PIN နံပါတ်ကို ဘဏ်ဝန်ထမ်းအပါအဝင် ဘယ်သူ့ကိုမှ လုံးဝ (လုံးဝ) မပြောပါနှင့်။';
 
-PRACTICAL ADVICE:
-- Verify any job: Google the company name + "scam" | check if official website actually exists
-- Reverse image search ALL profile photos using Google Images or TinEye
-- Check investment platforms: SEC Thailand or MAS Singapore registration database
-- If scammed: call bank immediately (first 24 hours is critical), save ALL evidence (screenshots, transaction records, chat logs)
-- Never be ashamed — these are sophisticated professional criminals; doctors, engineers, and educated people get scammed too
+// ── PII Detection — detects if user is leaking sensitive credentials
+function detectPII(text) {
+  const lower = text.toLowerCase();
+  const hasSensitiveKeyword = ['otp', 'pin', 'password', 'လျှို့ဝှက်', 'ဂဏန်း ၆', 'ဂဏန်းခြောက်'].some(k => lower.includes(k));
+  const hasSixDigits = /\b\d{6}\b/.test(text);
+  const hasPinDigits = /\bpin\b.*\d{4,}|\d{4,}.*\bpin\b/i.test(text);
+  return (hasSensitiveKeyword && hasSixDigits) || hasPinDigits;
+}
 
-TONE: Warm, caring, like a knowledgeable older sibling. Urgent when needed but never alarming or scary. Never judgmental toward victims.`;
+// ── Local DB Keyword Matching (RAG)
+function matchLocalDB(text) {
+  const lower = text.toLowerCase();
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const topic of ALL_TOPICS) {
+    const keywords = topic.keywords || [];
+    let score = 0;
+    for (const kw of keywords) {
+      if (lower.includes(kw.toLowerCase())) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = topic;
+    }
+  }
+
+  return bestScore >= 1 ? { topic: bestMatch, score: bestScore } : null;
+}
+
+function buildRAGContext(topic) {
+  const lines = [];
+  if (topic.scam_name) lines.push(`Scam အမျိုးအစား: ${topic.scam_name}`);
+  if (topic.mechanism) lines.push(`ဖြစ်ပွားပုံ (Mechanism): ${topic.mechanism}`);
+  if (topic.red_flags?.length) {
+    lines.push(`သတိပေးနိမိတ်များ (Red Flags):\n${topic.red_flags.map(f => `• ${f}`).join('\n')}`);
+  }
+  if (topic.prevention_guide) lines.push(`ကာကွယ်နည်း (Prevention): ${topic.prevention_guide}`);
+  if (topic.answer) lines.push(`အသေးစိတ်အချက်အလက်: ${topic.answer}`);
+  return lines.join('\n\n');
+}
+
+// ── Ensure Golden Rule appears in every AI reply
+function ensureGoldenRule(reply) {
+  if (reply.includes('ရွှေရောင်စည်းမျဉ်း')) return reply;
+  return reply + GOLDEN_RULE;
+}
 
 // ── Rate limiter (in-memory, resets on cold start)
 const rateLimitMap = new Map();
@@ -110,18 +170,18 @@ function estimateCost(inputTokens, outputTokens) {
 
 async function checkMonthlyLimit(supabaseUrl, supabaseKey) {
   const limit = parseFloat(process.env.MONTHLY_COST_LIMIT_USD || '2.0');
-  const month = new Date().toISOString().slice(0, 7); // "2026-06"
+  const month = new Date().toISOString().slice(0, 7);
   try {
     const r = await fetch(
       `${supabaseUrl}/rest/v1/monthly_usage?month=eq.${month}&select=estimated_cost_usd`,
       { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
     );
-    if (!r.ok) return true; // fail open
+    if (!r.ok) return true;
     const rows = await r.json();
     const cost = rows[0]?.estimated_cost_usd || 0;
     return parseFloat(cost) < limit;
   } catch {
-    return true; // fail open
+    return true;
   }
 }
 
@@ -139,7 +199,7 @@ async function incrementMonthlyUsage(supabaseUrl, supabaseKey, inputTokens, outp
   }).catch(() => {});
 }
 
-// ── Cached answers — in-memory store with 5-min TTL (warm Lambda reuse)
+// ── Cached answers (Supabase) — in-memory store with 5-min TTL
 let _cachedAnswers = null;
 let _cachedAnswersAt = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -171,7 +231,6 @@ function matchCachedAnswer(answers, text) {
 }
 
 function incrementCacheHit(supabaseUrl, supabaseKey, id) {
-  // Fire-and-forget via Supabase RPC; fails silently if function not created
   fetch(`${supabaseUrl}/rest/v1/rpc/increment_cache_hit`, {
     method: 'POST',
     headers: {
@@ -237,7 +296,7 @@ exports.handler = async function(event) {
     created_at: new Date().toISOString()
   });
 
-  // ── Check monthly cost limit
+  // ── GUARD 1: Monthly cost limit
   if (supabaseUrl && supabaseKey) {
     const underLimit = await checkMonthlyLimit(supabaseUrl, supabaseKey);
     if (!underLimit) {
@@ -251,7 +310,17 @@ exports.handler = async function(event) {
     }
   }
 
-  // ── Check cached answers before calling Gemini
+  // ── GUARD 2: PII Detection — user leaking OTP/PIN
+  if (detectPII(userMessage)) {
+    const piiWarning = '⚠️ **[သတိပေးချက်]** သင်၏ OTP/PIN ကို ဤနေရာတွင် လုံးဝမရေးပါနှင့်။ ၎င်းတို့ကို မည်သူ့ကိုမျှ မပြောပါနှင့်။\n\nသင့်အကောင့် ဖောက်ထွင်းခံရမည် ကြောက်ပါက ချက်ချင်း KBZ Pay / Wave Money Customer Care ကို ဆက်သွယ်ပြီး အကောင့် ယာယီပိတ်ပစ်ပါ။\n\n🇲🇲 KBZ: 09-777-911-880 | Wave: 09-455-252-525';
+    await logToSupabase(supabaseUrl, supabaseKey, {
+      session_id: sessionId || 'anon', role: 'pii_block',
+      message: 'PII detected — blocked', ip_hash: ipHash, created_at: new Date().toISOString()
+    });
+    return { statusCode: 200, headers, body: JSON.stringify({ reply: piiWarning, cached: true }) };
+  }
+
+  // ── GUARD 3: Supabase cached answers
   if (supabaseUrl && supabaseKey) {
     const cachedList = await loadCachedAnswers(supabaseUrl, supabaseKey);
     const hit = matchCachedAnswer(cachedList, userMessage);
@@ -268,9 +337,24 @@ exports.handler = async function(event) {
     }
   }
 
+  // ── RAG: Local DB keyword match → inject context into prompt
+  const dbMatch = matchLocalDB(userMessage);
+  let ragContext = '';
+  if (dbMatch) {
+    ragContext = buildRAGContext(dbMatch.topic);
+  }
+
+  // ── Build message history with optional RAG context injected into last user message
+  const historyMessages = messages.slice(-20);
+  if (ragContext) {
+    const last = historyMessages[historyMessages.length - 1];
+    historyMessages[historyMessages.length - 1] = {
+      ...last,
+      content: `${last.content}\n\n[DB Context]\n---\n${ragContext}\n---`
+    };
+  }
+
   // ── Gemini API call
-  // Model: gemini-1.5-pro (best quality, free tier: 2 RPM, 50 RPD on free; paid: 1000 RPM)
-  // Alternative: gemini-2.0-flash (faster, higher free limits: 15 RPM, 1500 RPD)
   const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
 
@@ -278,10 +362,10 @@ exports.handler = async function(event) {
     systemInstruction: {
       parts: [{ text: SYSTEM_PROMPT }]
     },
-    contents: toGeminiContents(messages.slice(-20)),
+    contents: toGeminiContents(historyMessages),
     generationConfig: {
       maxOutputTokens: 2048,
-      temperature: 0.7,
+      temperature: 0.65,
       topP: 0.9,
       topK: 40
     },
@@ -305,7 +389,6 @@ exports.handler = async function(event) {
       const errMsg = errData?.error?.message || 'HTTP ' + response.status;
       console.error('Gemini API error:', response.status, errMsg);
 
-      // Handle specific Gemini error codes clearly
       if (response.status === 429) {
         return { statusCode: 429, headers, body: JSON.stringify({ error: 'AI rate limit reached. Please wait a moment and try again.' }) };
       }
@@ -316,11 +399,8 @@ exports.handler = async function(event) {
     }
 
     const data = await response.json();
-
-    // Gemini response structure: data.candidates[0].content.parts[0].text
     const candidate = data.candidates?.[0];
 
-    // Check for safety block or empty response
     if (!candidate || candidate.finishReason === 'SAFETY') {
       console.warn('Gemini blocked response:', candidate?.finishReason);
       const fallback = 'ဆောင်ရွက်မရပါ — မေးခွန်းကို နည်းနည်းပြောင်းပြီး ထပ်မံကြိုးစားပါ။\n(Unable to respond. Please rephrase and try again.)';
@@ -328,11 +408,14 @@ exports.handler = async function(event) {
       return { statusCode: 200, headers, body: JSON.stringify({ reply: fallback }) };
     }
 
-    const reply = candidate.content?.parts?.map(p => p.text || '').join('') || '';
+    let reply = candidate.content?.parts?.map(p => p.text || '').join('') || '';
 
     if (!reply.trim()) {
       return { statusCode: 200, headers, body: JSON.stringify({ reply: 'တုံ့ပြန်မှု မရရှိပါ — ထပ်မံ ကြိုးစားပါ။\n(No response received — please try again.)' }) };
     }
+
+    // Enforce Golden Rule footer on every reply
+    reply = ensureGoldenRule(reply);
 
     // Log AI reply
     await logToSupabase(supabaseUrl, supabaseKey, {
@@ -349,7 +432,7 @@ exports.handler = async function(event) {
       incrementMonthlyUsage(supabaseUrl, supabaseKey, usage.promptTokenCount || 0, usage.candidatesTokenCount || 0);
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ reply, usage, model }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ reply, usage, model, rag_used: !!ragContext }) };
 
   } catch (err) {
     console.error('Function error:', err);

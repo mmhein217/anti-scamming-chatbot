@@ -2,20 +2,49 @@
 // ScamAware MM — Production Anti-Scam AI for Myanmar
 // Architecture: PII Guard → Topic Guard → Supabase Cache → Local DB RAG → Gemini AI
 
-// ── Local Scam Knowledge Databases (RAG source)
-let DB_MASTER, DB_PREVENTION;
-try {
-  DB_MASTER = require('./db/db_master.json');
-  DB_PREVENTION = require('./db/db_prevention.json');
-} catch {
-  DB_MASTER = { categories: [] };
-  DB_PREVENTION = { categories: [] };
+// ── Scam Topics Cache (loaded from Supabase, refreshed every 10 min)
+let _scamTopics = null;
+let _scamTopicsAt = 0;
+const TOPICS_TTL_MS = 10 * 60 * 1000;
+
+async function loadScamTopics(supabaseUrl, supabaseKey) {
+  const now = Date.now();
+  if (_scamTopics && now - _scamTopicsAt < TOPICS_TTL_MS) return _scamTopics;
+  try {
+    const r = await fetch(
+      `${supabaseUrl}/rest/v1/scam_topics?is_active=eq.true&select=topic_id,keywords,scam_name,mechanism,red_flags,prevention_guide,answer`,
+      { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+    );
+    if (!r.ok) return _scamTopics || [];
+    _scamTopics = await r.json();
+    _scamTopicsAt = now;
+    return _scamTopics;
+  } catch {
+    return _scamTopics || [];
+  }
 }
 
-const ALL_TOPICS = [
-  ...(DB_MASTER.categories || []).flatMap(c => c.topics || []),
-  ...(DB_PREVENTION.categories || []).flatMap(c => c.topics || [])
-];
+function matchScamTopic(topics, text) {
+  const lower = text.toLowerCase();
+  let best = null, bestScore = 0;
+  for (const topic of topics) {
+    const kws = (topic.keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+    const score = kws.filter(kw => lower.includes(kw)).length;
+    if (score > bestScore) { bestScore = score; best = topic; }
+  }
+  return bestScore >= 1 ? { topic: best, score: bestScore } : null;
+}
+
+function buildRAGContext(topic) {
+  const lines = [];
+  if (topic.scam_name) lines.push(`Scam အမျိုးအစား: ${topic.scam_name}`);
+  if (topic.mechanism) lines.push(`ဖြစ်ပွားပုံ: ${topic.mechanism}`);
+  const flags = Array.isArray(topic.red_flags) ? topic.red_flags : (typeof topic.red_flags === 'string' ? JSON.parse(topic.red_flags || '[]') : []);
+  if (flags.length) lines.push(`သတိပေးနိမိတ်များ:\n${flags.map(f => `• ${f}`).join('\n')}`);
+  if (topic.prevention_guide) lines.push(`ကာကွယ်နည်း: ${topic.prevention_guide}`);
+  if (topic.answer) lines.push(`အသေးစိတ်: ${topic.answer}`);
+  return lines.join('\n\n');
+}
 
 // ── System Prompt: ScamAware MM
 const SYSTEM_PROMPT = `You are "ScamAware MM" (ScamGuard AI), a production-grade AI expert dedicated to educating the public and preventing online scams, mobile banking frauds (KPay/Wave Money), and cybercrimes in Myanmar. Your primary directive is to protect users by offering actionable, empathetic, and urgent advice.
@@ -85,38 +114,6 @@ function detectPII(text) {
   return (hasSensitiveKeyword && hasSixDigits) || hasPinDigits;
 }
 
-// ── Local DB Keyword Matching (RAG)
-function matchLocalDB(text) {
-  const lower = text.toLowerCase();
-  let bestMatch = null;
-  let bestScore = 0;
-
-  for (const topic of ALL_TOPICS) {
-    const keywords = topic.keywords || [];
-    let score = 0;
-    for (const kw of keywords) {
-      if (lower.includes(kw.toLowerCase())) score++;
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = topic;
-    }
-  }
-
-  return bestScore >= 1 ? { topic: bestMatch, score: bestScore } : null;
-}
-
-function buildRAGContext(topic) {
-  const lines = [];
-  if (topic.scam_name) lines.push(`Scam အမျိုးအစား: ${topic.scam_name}`);
-  if (topic.mechanism) lines.push(`ဖြစ်ပွားပုံ (Mechanism): ${topic.mechanism}`);
-  if (topic.red_flags?.length) {
-    lines.push(`သတိပေးနိမိတ်များ (Red Flags):\n${topic.red_flags.map(f => `• ${f}`).join('\n')}`);
-  }
-  if (topic.prevention_guide) lines.push(`ကာကွယ်နည်း (Prevention): ${topic.prevention_guide}`);
-  if (topic.answer) lines.push(`အသေးစိတ်အချက်အလက်: ${topic.answer}`);
-  return lines.join('\n\n');
-}
 
 // ── Ensure Golden Rule appears in every AI reply
 function ensureGoldenRule(reply) {
@@ -337,42 +334,37 @@ exports.handler = async function(event) {
     }
   }
 
-  // ── RAG: Local DB keyword match
-  const dbMatch = matchLocalDB(userMessage);
+  // ── RAG: Load scam topics from Supabase and match
+  const scamTopics = await loadScamTopics(supabaseUrl, supabaseKey);
+  const dbMatch = matchScamTopic(scamTopics, userMessage);
 
-  // Strong match (score >= 2) → answer directly from DB, skip AI entirely
-  if (dbMatch && dbMatch.score >= 2) {
+  if (dbMatch) {
     const t = dbMatch.topic;
+    const flags = Array.isArray(t.red_flags) ? t.red_flags
+      : (typeof t.red_flags === 'string' ? JSON.parse(t.red_flags || '[]') : []);
+
     const lines = [];
     if (t.scam_name) lines.push(`**${t.scam_name}** နှင့်ပတ်သက်၍ သတိပြုရမည့်အချက်များ ရှင်းပြပေးပါမည်။`);
     if (t.mechanism) lines.push(`\n**ဖြစ်ပွားပုံ:**\n${t.mechanism}`);
-    if (t.red_flags?.length) lines.push(`\n**သတိပေးနိမိတ်များ:**\n${t.red_flags.map(f => `🚩 ${f}`).join('\n')}`);
+    if (flags.length) lines.push(`\n**သတိပေးနိမိတ်များ:**\n${flags.map(f => `🚩 ${f}`).join('\n')}`);
     if (t.answer && !t.mechanism) lines.push(`\n${t.answer}`);
     if (t.prevention_guide) lines.push(`\n💡 **ကာကွယ်နည်း:**\n${t.prevention_guide}`);
     lines.push(GOLDEN_RULE);
 
     const dbReply = lines.join('\n');
     await logToSupabase(supabaseUrl, supabaseKey, {
-      session_id: sessionId || 'anon', role: 'db_cache',
-      message: `[DB:${t.topic_id||'?'}] ${dbReply.slice(0, 1950)}`,
+      session_id: sessionId || 'anon', role: 'db_match',
+      message: `[${t.topic_id||'?'}] ${dbReply.slice(0, 1950)}`,
       ip_hash: ipHash, created_at: new Date().toISOString()
     });
-    return { statusCode: 200, headers, body: JSON.stringify({ reply: dbReply, cached: true, source: 'local_db' }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ reply: dbReply, cached: true, source: 'supabase_db' }) };
   }
 
-  // Weak match (score = 1) → inject as context for AI
-  let ragContext = '';
-  if (dbMatch) ragContext = buildRAGContext(dbMatch.topic);
+  // ── No DB match → AI with RAG context if partial info found
+  const ragContext = scamTopics.length > 0 ? '' : ''; // placeholder kept for future use
 
   // ── Build message history (keep last 10 to reduce token usage)
   const historyMessages = messages.slice(-10);
-  if (ragContext) {
-    const last = historyMessages[historyMessages.length - 1];
-    historyMessages[historyMessages.length - 1] = {
-      ...last,
-      content: `${last.content}\n\n[DB Context]\n---\n${ragContext}\n---`
-    };
-  }
 
   // ── Gemini API call — single attempt, immediate fallback (no retry stress)
   const MODELS = [

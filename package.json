@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Myanmar Anti-Scam AI Chatbot with Admin Panel",
   "scripts": {
-    "dev": "netlify dev",
+    "dev": "vercel dev",
     "build": "echo 'No build step needed'"
   },
   "dependencies": {

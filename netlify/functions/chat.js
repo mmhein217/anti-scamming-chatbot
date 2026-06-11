@@ -337,15 +337,35 @@ exports.handler = async function(event) {
     }
   }
 
-  // ── RAG: Local DB keyword match → inject context into prompt
+  // ── RAG: Local DB keyword match
   const dbMatch = matchLocalDB(userMessage);
-  let ragContext = '';
-  if (dbMatch) {
-    ragContext = buildRAGContext(dbMatch.topic);
+
+  // Strong match (score >= 2) → answer directly from DB, skip AI entirely
+  if (dbMatch && dbMatch.score >= 2) {
+    const t = dbMatch.topic;
+    const lines = [];
+    if (t.scam_name) lines.push(`**${t.scam_name}** နှင့်ပတ်သက်၍ သတိပြုရမည့်အချက်များ ရှင်းပြပေးပါမည်။`);
+    if (t.mechanism) lines.push(`\n**ဖြစ်ပွားပုံ:**\n${t.mechanism}`);
+    if (t.red_flags?.length) lines.push(`\n**သတိပေးနိမိတ်များ:**\n${t.red_flags.map(f => `🚩 ${f}`).join('\n')}`);
+    if (t.answer && !t.mechanism) lines.push(`\n${t.answer}`);
+    if (t.prevention_guide) lines.push(`\n💡 **ကာကွယ်နည်း:**\n${t.prevention_guide}`);
+    lines.push(GOLDEN_RULE);
+
+    const dbReply = lines.join('\n');
+    await logToSupabase(supabaseUrl, supabaseKey, {
+      session_id: sessionId || 'anon', role: 'db_cache',
+      message: `[DB:${t.topic_id||'?'}] ${dbReply.slice(0, 1950)}`,
+      ip_hash: ipHash, created_at: new Date().toISOString()
+    });
+    return { statusCode: 200, headers, body: JSON.stringify({ reply: dbReply, cached: true, source: 'local_db' }) };
   }
 
-  // ── Build message history with optional RAG context injected into last user message
-  const historyMessages = messages.slice(-20);
+  // Weak match (score = 1) → inject as context for AI
+  let ragContext = '';
+  if (dbMatch) ragContext = buildRAGContext(dbMatch.topic);
+
+  // ── Build message history (keep last 10 to reduce token usage)
+  const historyMessages = messages.slice(-10);
   if (ragContext) {
     const last = historyMessages[historyMessages.length - 1];
     historyMessages[historyMessages.length - 1] = {
@@ -354,10 +374,9 @@ exports.handler = async function(event) {
     };
   }
 
-  // ── Gemini API call with retry + fallback model
+  // ── Gemini API call — single attempt, immediate fallback (no retry stress)
   const MODELS = [
-    process.env.GEMINI_MODEL || 'gemini-2.0-flash',
-    'gemini-1.5-flash'  // fallback if primary fails
+    process.env.GEMINI_MODEL || 'gemini-2.0-flash'
   ];
 
   const FALLBACK_REPLY = `သင်မေးသောမေးခွန်းကို လက်ခံရရှိပါသည်။ ယခုအချိန်တွင် AI ဝန်ဆောင်မှု ယာယီအနှောင့်အယှက်ရှိနေပါသည်။

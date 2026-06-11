@@ -354,21 +354,28 @@ exports.handler = async function(event) {
     };
   }
 
-  // ── Gemini API call
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+  // ── Gemini API call with retry + fallback model
+  const MODELS = [
+    process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+    'gemini-1.5-flash'  // fallback if primary fails
+  ];
+
+  const FALLBACK_REPLY = `သင်မေးသောမေးခွန်းကို လက်ခံရရှိပါသည်။ ယခုအချိန်တွင် AI ဝန်ဆောင်မှု ယာယီအနှောင့်အယှက်ရှိနေပါသည်။
+
+Scam နှင့် ပတ်သက်သောအရေးပေါ်ကိစ္စများအတွက်:
+• 🇲🇲 မြန်မာရဲ: **199**
+• 🇹🇭 ထိုင်းရဲ: **191**
+• 🇹🇭 လူကုန်ကူးမှုတိုင်ကြားရန်: **1300** (၂၄ နာရီ)
+• IOM လူကုန်ကူးမှုကယ်ဆယ်ရေး: **+95-1-230-1854**
+
+မိနစ်အနည်းငယ်ကြာပြီးနောက် ထပ်မံမေးမြန်းနိုင်ပါသည်။
+
+> 💡 **အရေးကြီးဆုံးရွှေရောင်စည်းမျဉ်း:** သင်၏ KPay/Wave Money OTP (ဂဏန်း ၆ လုံး) နှင့် PIN နံပါတ်ကို ဘဏ်ဝန်ထမ်းအပါအဝင် ဘယ်သူ့ကိုမှ လုံးဝ (လုံးဝ) မပြောပါနှင့်။`;
 
   const geminiPayload = {
-    systemInstruction: {
-      parts: [{ text: SYSTEM_PROMPT }]
-    },
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
     contents: toGeminiContents(historyMessages),
-    generationConfig: {
-      maxOutputTokens: 2048,
-      temperature: 0.65,
-      topP: 0.9,
-      topK: 40
-    },
+    generationConfig: { maxOutputTokens: 2048, temperature: 0.65, topP: 0.9, topK: 40 },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_ONLY_HIGH' },
@@ -377,72 +384,79 @@ exports.handler = async function(event) {
     ]
   };
 
-  try {
-    const response = await fetch(geminiUrl, {
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+
+  async function callGemini(model) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(geminiPayload)
     });
+    return { res, model };
+  }
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const errMsg = errData?.error?.message || 'HTTP ' + response.status;
-      console.error('Gemini API error:', response.status, errMsg);
+  try {
+    let lastStatus = 0;
+    let data = null;
+    let usedModel = MODELS[0];
 
-      if (response.status === 429) {
-        return { statusCode: 429, headers, body: JSON.stringify({ error: 'AI rate limit reached. Please wait a moment and try again.' }) };
+    for (let i = 0; i < MODELS.length; i++) {
+      if (i > 0) await delay(1500); // wait before retry with fallback model
+      const { res, model } = await callGemini(MODELS[i]);
+      usedModel = model;
+      lastStatus = res.status;
+
+      if (res.ok) {
+        data = await res.json();
+        break;
       }
-      if (response.status === 400) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Request error: ' + errMsg }) };
+
+      const errData = await res.json().catch(() => ({}));
+      console.error(`Gemini [${model}] error ${res.status}:`, errData?.error?.message);
+
+      // 400 = bad request, no point retrying with different model
+      if (res.status === 400) {
+        return { statusCode: 200, headers, body: JSON.stringify({ reply: FALLBACK_REPLY, cached: true }) };
       }
-      return { statusCode: response.status, headers, body: JSON.stringify({ error: 'AI service error: ' + errMsg }) };
+      // 429 / 503 → try next model
     }
 
-    const data = await response.json();
-    const candidate = data.candidates?.[0];
+    // All models failed
+    if (!data) {
+      await logToSupabase(supabaseUrl, supabaseKey, {
+        session_id: sessionId || 'anon', role: 'error',
+        message: `All models failed, last status: ${lastStatus}`, ip_hash: ipHash, created_at: new Date().toISOString()
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ reply: FALLBACK_REPLY, cached: true }) };
+    }
 
+    const candidate = data.candidates?.[0];
     if (!candidate || candidate.finishReason === 'SAFETY') {
-      console.warn('Gemini blocked response:', candidate?.finishReason);
-      const fallback = 'ဆောင်ရွက်မရပါ — မေးခွန်းကို နည်းနည်းပြောင်းပြီး ထပ်မံကြိုးစားပါ။\n(Unable to respond. Please rephrase and try again.)';
-      await logToSupabase(supabaseUrl, supabaseKey, { session_id: sessionId || 'anon', role: 'error', message: 'SAFETY_BLOCK: ' + (candidate?.finishReason || 'empty'), ip_hash: ipHash, created_at: new Date().toISOString() });
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: fallback }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ reply: FALLBACK_REPLY, cached: true }) };
     }
 
     let reply = candidate.content?.parts?.map(p => p.text || '').join('') || '';
-
     if (!reply.trim()) {
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: 'တုံ့ပြန်မှု မရရှိပါ — ထပ်မံ ကြိုးစားပါ။\n(No response received — please try again.)' }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ reply: FALLBACK_REPLY, cached: true }) };
     }
 
-    // Enforce Golden Rule footer on every reply
     reply = ensureGoldenRule(reply);
 
-    // Log AI reply
     await logToSupabase(supabaseUrl, supabaseKey, {
-      session_id: sessionId || 'anon',
-      role: 'assistant',
-      message: reply.slice(0, 2000),
-      ip_hash: ipHash,
-      created_at: new Date().toISOString()
+      session_id: sessionId || 'anon', role: 'assistant',
+      message: reply.slice(0, 2000), ip_hash: ipHash, created_at: new Date().toISOString()
     });
 
-    // Increment monthly usage (fire-and-forget)
     const usage = data.usageMetadata || null;
     if (supabaseUrl && supabaseKey && usage) {
       incrementMonthlyUsage(supabaseUrl, supabaseKey, usage.promptTokenCount || 0, usage.candidatesTokenCount || 0);
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ reply, usage, model, rag_used: !!ragContext }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ reply, usage, model: usedModel, rag_used: !!ragContext }) };
 
   } catch (err) {
     console.error('Function error:', err);
-    await logToSupabase(supabaseUrl, supabaseKey, {
-      session_id: sessionId || 'anon',
-      role: 'error',
-      message: err.message,
-      ip_hash: ipHash,
-      created_at: new Date().toISOString()
-    });
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error: ' + err.message }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ reply: FALLBACK_REPLY, cached: true }) };
   }
 };

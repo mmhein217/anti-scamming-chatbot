@@ -196,6 +196,46 @@ exports.handler = async function(event) {
       return { statusCode: 200, headers: h, body: JSON.stringify({ keywords: kw }) };
     }
 
+    // ── GET CACHED ANSWERS ──
+    if (action === 'getCachedAnswers') {
+      if (!hasSupabase) return { statusCode: 200, headers: h, body: JSON.stringify({ answers: [] }) };
+      const rows = await supabaseRequest(supabaseUrl, supabaseKey, 'cached_answers', 'GET', null, '?select=*&order=id.asc');
+      return { statusCode: 200, headers: h, body: JSON.stringify({ answers: rows || [] }) };
+    }
+
+    // ── ADD CACHED ANSWER ──
+    if (action === 'addCachedAnswer') {
+      if (!hasSupabase) return { statusCode: 400, headers: h, body: JSON.stringify({ error: 'Supabase not configured' }) };
+      const { question, keywords, answer } = body;
+      if (!question || !keywords || !answer) return { statusCode: 400, headers: h, body: JSON.stringify({ error: 'question, keywords, and answer required' }) };
+      const row = await supabaseRequest(supabaseUrl, supabaseKey, 'cached_answers', 'POST',
+        { question, keywords, answer, is_active: true, hit_count: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, '');
+      return { statusCode: 200, headers: h, body: JSON.stringify({ ok: true, id: row?.[0]?.id }) };
+    }
+
+    // ── UPDATE CACHED ANSWER ──
+    if (action === 'updateCachedAnswer') {
+      if (!hasSupabase) return { statusCode: 400, headers: h, body: JSON.stringify({ error: 'Supabase not configured' }) };
+      const { id, question, keywords, answer, is_active } = body;
+      if (!id) return { statusCode: 400, headers: h, body: JSON.stringify({ error: 'id required' }) };
+      const patch = { updated_at: new Date().toISOString() };
+      if (question !== undefined) patch.question = question;
+      if (keywords !== undefined) patch.keywords = keywords;
+      if (answer !== undefined) patch.answer = answer;
+      if (is_active !== undefined) patch.is_active = is_active;
+      await supabaseRequest(supabaseUrl, supabaseKey, 'cached_answers', 'PATCH', patch, `?id=eq.${id}`);
+      return { statusCode: 200, headers: h, body: JSON.stringify({ ok: true }) };
+    }
+
+    // ── DELETE CACHED ANSWER ──
+    if (action === 'deleteCachedAnswer') {
+      if (!hasSupabase) return { statusCode: 400, headers: h, body: JSON.stringify({ error: 'Supabase not configured' }) };
+      const { id } = body;
+      if (!id) return { statusCode: 400, headers: h, body: JSON.stringify({ error: 'id required' }) };
+      await supabaseRequest(supabaseUrl, supabaseKey, 'cached_answers', 'DELETE', null, `?id=eq.${id}`);
+      return { statusCode: 200, headers: h, body: JSON.stringify({ ok: true }) };
+    }
+
   } catch (err) {
     console.error('Admin function error:', err);
     return { statusCode: 500, headers: h, body: JSON.stringify({ error: err.message }) };

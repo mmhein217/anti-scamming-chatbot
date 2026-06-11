@@ -105,6 +105,50 @@ function toGeminiContents(messages) {
   }));
 }
 
+// ── Cached answers — in-memory store with 5-min TTL (warm Lambda reuse)
+let _cachedAnswers = null;
+let _cachedAnswersAt = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+async function loadCachedAnswers(supabaseUrl, supabaseKey) {
+  const now = Date.now();
+  if (_cachedAnswers && now - _cachedAnswersAt < CACHE_TTL_MS) return _cachedAnswers;
+  try {
+    const r = await fetch(
+      `${supabaseUrl}/rest/v1/cached_answers?select=id,question,keywords,answer&is_active=eq.true`,
+      { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+    );
+    if (!r.ok) return _cachedAnswers || [];
+    _cachedAnswers = await r.json();
+    _cachedAnswersAt = now;
+    return _cachedAnswers;
+  } catch {
+    return _cachedAnswers || [];
+  }
+}
+
+function matchCachedAnswer(answers, text) {
+  const lower = text.toLowerCase();
+  for (const a of answers) {
+    const kws = (a.keywords || '').split(',').map(k => k.trim()).filter(Boolean);
+    if (kws.some(kw => lower.includes(kw.toLowerCase()))) return a;
+  }
+  return null;
+}
+
+function incrementCacheHit(supabaseUrl, supabaseKey, id) {
+  // Fire-and-forget via Supabase RPC; fails silently if function not created
+  fetch(`${supabaseUrl}/rest/v1/rpc/increment_cache_hit`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`
+    },
+    body: JSON.stringify({ answer_id: id })
+  }).catch(() => {});
+}
+
 exports.handler = async function(event) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -158,6 +202,23 @@ exports.handler = async function(event) {
     ip_hash: ipHash,
     created_at: new Date().toISOString()
   });
+
+  // ── Check cached answers before calling Gemini
+  if (supabaseUrl && supabaseKey) {
+    const cachedList = await loadCachedAnswers(supabaseUrl, supabaseKey);
+    const hit = matchCachedAnswer(cachedList, userMessage);
+    if (hit) {
+      incrementCacheHit(supabaseUrl, supabaseKey, hit.id);
+      await logToSupabase(supabaseUrl, supabaseKey, {
+        session_id: sessionId || 'anon',
+        role: 'cached',
+        message: `[${hit.question}] ${hit.answer.slice(0, 1950)}`,
+        ip_hash: ipHash,
+        created_at: new Date().toISOString()
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ reply: hit.answer, cached: true }) };
+    }
+  }
 
   // ── Gemini API call
   // Model: gemini-1.5-pro (best quality, free tier: 2 RPM, 50 RPD on free; paid: 1000 RPM)

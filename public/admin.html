@@ -194,6 +194,7 @@ tr:hover td{background:var(--brl)}
     <div class="tab" onclick="tab('logs',this)">📋 Chat Logs</div>
     <div class="tab" onclick="tab('sessions',this)">👥 Sessions</div>
     <div class="tab" onclick="tab('keywords',this)">🔍 Keywords</div>
+    <div class="tab" onclick="tab('cache',this)">⚡ Cached Answers</div>
     <div class="tab" onclick="tab('config',this)">⚙️ Config</div>
     <div class="tab" onclick="tab('setup',this)">🚀 Setup Guide</div>
   </div>
@@ -226,7 +227,8 @@ tr:hover td{background:var(--brl)}
           <div class="brow">
             <button class="btn bp bsm" onclick="loadOverview()">↻ Refresh Stats</button>
             <button class="btn bs bsm" onclick="tab('logs',document.querySelectorAll('.tab')[1])">View Logs</button>
-            <button class="btn bs bsm" onclick="tab('setup',document.querySelectorAll('.tab')[5])">Setup Guide</button>
+            <button class="btn bs bsm" onclick="tab('cache',document.querySelectorAll('.tab')[4])">Cached Answers</button>
+            <button class="btn bs bsm" onclick="tab('setup',document.querySelectorAll('.tab')[6])">Setup Guide</button>
             <button class="btn bd2 bsm" onclick="confirmDeleteLogs()">🗑 Clear Old Logs</button>
           </div>
         </div>
@@ -276,6 +278,55 @@ tr:hover td{background:var(--brl)}
       <div class="card" style="margin-bottom:16px">
         <div class="ch"><h3>🔍 Keyword Frequency (last 1000 messages)</h3><button class="btn bs bsm" onclick="loadKeywords()">↻ Refresh</button></div>
         <div class="cb" id="kw-body"><div class="loading"><div class="spin"></div>Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- CACHED ANSWERS -->
+    <div class="pane" id="pane-cache">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div>
+          <h2 style="font-size:15px;font-weight:700;color:var(--brd)">⚡ Cached Answers</h2>
+          <p style="font-size:12.5px;color:var(--t3);margin-top:3px">Pre-written answers returned instantly — no AI call needed. Keyword cache refreshes every 5 minutes on the server.</p>
+        </div>
+        <button class="btn bp bsm" onclick="showCacheForm()">+ Add Answer</button>
+      </div>
+
+      <!-- Add / Edit form -->
+      <div class="card" id="cache-form-card" style="display:none;margin-bottom:16px">
+        <div class="ch">
+          <h3 id="cache-form-title">Add Cached Answer</h3>
+          <button class="btn bs bsm" onclick="hideCacheForm()">✕ Cancel</button>
+        </div>
+        <div class="cb">
+          <div class="f">
+            <label>Question Label <span style="font-weight:400;color:var(--t3)">(admin reference only)</span></label>
+            <input id="ca-question" placeholder="e.g. What is KK Park?" maxlength="200">
+          </div>
+          <div class="f">
+            <label>Keywords <span style="font-weight:400;color:var(--t3)">(comma-separated — ANY match triggers this answer)</span></label>
+            <input id="ca-keywords" placeholder="kk park,ကေကေပတ်,myawaddy,မြဝတီ">
+            <p class="hint">English keywords are case-insensitive. Burmese keywords match by substring. Example: <code>pig butchering,ဝက်သတ်,crypto scam</code></p>
+          </div>
+          <div class="f">
+            <label>Answer <span style="font-weight:400;color:var(--t3)">(full response returned to user)</span></label>
+            <textarea id="ca-answer" rows="8" placeholder="ကေကေပတ်ဆိုသည်မှာ..."></textarea>
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:13px;font-weight:600;color:var(--t2);cursor:pointer">
+              <input type="checkbox" id="ca-active" checked style="margin-right:5px;accent-color:var(--br)"> Active (return this answer when matched)
+            </label>
+          </div>
+          <div class="brow">
+            <button class="btn bp bsm" onclick="saveCacheAnswer()">Save Answer</button>
+            <button class="btn bs bsm" onclick="hideCacheForm()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Answers table -->
+      <div class="card">
+        <div class="ch"><h3>Saved Answers</h3><button class="btn bs bsm" onclick="loadCacheAnswers()">↻ Refresh</button></div>
+        <div id="cache-table-wrap"><div class="loading"><div class="spin"></div>Loading...</div></div>
       </div>
     </div>
 
@@ -369,20 +420,36 @@ tr:hover td{background:var(--brl)}
   updated_at  <span class="kw-str">TIMESTAMPTZ</span> <span class="kw-high">DEFAULT NOW()</span>
 );
 
-<span class="kw-high">-- Enable Row Level Security</span>
-<span class="kw-str">ALTER TABLE</span> chat_logs <span class="kw-str">ENABLE ROW LEVEL SECURITY</span>;
-<span class="kw-str">ALTER TABLE</span> site_config <span class="kw-str">ENABLE ROW LEVEL SECURITY</span>;
+<span class="kw-high">-- Cached answers table (instant replies, no AI call)</span>
+<span class="kw-str">CREATE TABLE</span> cached_answers (
+  id          <span class="kw-str">BIGSERIAL PRIMARY KEY</span>,
+  question    <span class="kw-str">TEXT</span> <span class="kw-high">NOT NULL</span>,
+  keywords    <span class="kw-str">TEXT</span> <span class="kw-high">NOT NULL</span>,
+  answer      <span class="kw-str">TEXT</span> <span class="kw-high">NOT NULL</span>,
+  is_active   <span class="kw-str">BOOLEAN</span> <span class="kw-high">DEFAULT</span> <span class="kw-high">true</span>,
+  hit_count   <span class="kw-str">INTEGER</span> <span class="kw-high">DEFAULT</span> <span class="kw-num">0</span>,
+  created_at  <span class="kw-str">TIMESTAMPTZ</span> <span class="kw-high">DEFAULT NOW()</span>,
+  updated_at  <span class="kw-str">TIMESTAMPTZ</span> <span class="kw-high">DEFAULT NOW()</span>
+);
 
-<span class="kw-high">-- Allow service role full access (functions use service key)</span>
-<span class="kw-str">CREATE POLICY</span> <span class="kw-num">"service_all"</span> <span class="kw-str">ON</span> chat_logs
-  <span class="kw-str">FOR ALL USING</span> (<span class="kw-high">true</span>);
-<span class="kw-str">CREATE POLICY</span> <span class="kw-num">"service_all"</span> <span class="kw-str">ON</span> site_config
-  <span class="kw-str">FOR ALL USING</span> (<span class="kw-high">true</span>);
+<span class="kw-str">ALTER TABLE</span> chat_logs      <span class="kw-str">ENABLE ROW LEVEL SECURITY</span>;
+<span class="kw-str">ALTER TABLE</span> site_config    <span class="kw-str">ENABLE ROW LEVEL SECURITY</span>;
+<span class="kw-str">ALTER TABLE</span> cached_answers <span class="kw-str">ENABLE ROW LEVEL SECURITY</span>;
 
-<span class="kw-high">-- Index for fast queries</span>
-<span class="kw-str">CREATE INDEX</span> idx_logs_session <span class="kw-str">ON</span> chat_logs(session_id);
-<span class="kw-str">CREATE INDEX</span> idx_logs_created <span class="kw-str">ON</span> chat_logs(created_at <span class="kw-str">DESC</span>);
-<span class="kw-str">CREATE INDEX</span> idx_logs_role    <span class="kw-str">ON</span> chat_logs(role);
+<span class="kw-str">CREATE POLICY</span> <span class="kw-num">"service_all"</span> <span class="kw-str">ON</span> chat_logs      <span class="kw-str">FOR ALL USING</span> (<span class="kw-high">true</span>);
+<span class="kw-str">CREATE POLICY</span> <span class="kw-num">"service_all"</span> <span class="kw-str">ON</span> site_config    <span class="kw-str">FOR ALL USING</span> (<span class="kw-high">true</span>);
+<span class="kw-str">CREATE POLICY</span> <span class="kw-num">"service_all"</span> <span class="kw-str">ON</span> cached_answers <span class="kw-str">FOR ALL USING</span> (<span class="kw-high">true</span>);
+
+<span class="kw-str">CREATE INDEX</span> idx_logs_session  <span class="kw-str">ON</span> chat_logs(session_id);
+<span class="kw-str">CREATE INDEX</span> idx_logs_created  <span class="kw-str">ON</span> chat_logs(created_at <span class="kw-str">DESC</span>);
+<span class="kw-str">CREATE INDEX</span> idx_logs_role     <span class="kw-str">ON</span> chat_logs(role);
+<span class="kw-str">CREATE INDEX</span> idx_cache_active  <span class="kw-str">ON</span> cached_answers(is_active);
+
+<span class="kw-high">-- Atomic hit counter (called by chat function)</span>
+<span class="kw-str">CREATE OR REPLACE FUNCTION</span> increment_cache_hit(answer_id <span class="kw-str">BIGINT</span>)
+<span class="kw-str">RETURNS void AS</span> $$
+  <span class="kw-str">UPDATE</span> cached_answers <span class="kw-str">SET</span> hit_count = hit_count + <span class="kw-num">1</span> <span class="kw-str">WHERE</span> id = answer_id;
+$$ <span class="kw-str">LANGUAGE sql SECURITY DEFINER</span>;
               </div>
             </div></div>
 
@@ -517,6 +584,7 @@ function loadTab(id) {
   if (id === 'logs') loadLogs(0);
   if (id === 'sessions') loadSessions();
   if (id === 'keywords') loadKeywords();
+  if (id === 'cache') loadCacheAnswers();
   if (id === 'config') loadConfig();
 }
 
@@ -761,16 +829,144 @@ CREATE TABLE site_config (
   updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE chat_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE site_config ENABLE ROW LEVEL SECURITY;
+-- Cached answers table (instant replies, no AI call)
+CREATE TABLE cached_answers (
+  id          BIGSERIAL PRIMARY KEY,
+  question    TEXT NOT NULL,
+  keywords    TEXT NOT NULL,
+  answer      TEXT NOT NULL,
+  is_active   BOOLEAN DEFAULT true,
+  hit_count   INTEGER DEFAULT 0,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
 
-CREATE POLICY "service_all" ON chat_logs FOR ALL USING (true);
-CREATE POLICY "service_all" ON site_config FOR ALL USING (true);
+ALTER TABLE chat_logs      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE site_config    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cached_answers ENABLE ROW LEVEL SECURITY;
 
-CREATE INDEX idx_logs_session ON chat_logs(session_id);
-CREATE INDEX idx_logs_created ON chat_logs(created_at DESC);
-CREATE INDEX idx_logs_role    ON chat_logs(role);`;
+CREATE POLICY "service_all" ON chat_logs      FOR ALL USING (true);
+CREATE POLICY "service_all" ON site_config    FOR ALL USING (true);
+CREATE POLICY "service_all" ON cached_answers FOR ALL USING (true);
+
+CREATE INDEX idx_logs_session  ON chat_logs(session_id);
+CREATE INDEX idx_logs_created  ON chat_logs(created_at DESC);
+CREATE INDEX idx_logs_role     ON chat_logs(role);
+CREATE INDEX idx_cache_active  ON cached_answers(is_active);
+
+-- RPC to increment hit count atomically
+CREATE OR REPLACE FUNCTION increment_cache_hit(answer_id BIGINT)
+RETURNS void AS $$
+  UPDATE cached_answers SET hit_count = hit_count + 1 WHERE id = answer_id;
+$$ LANGUAGE sql SECURITY DEFINER;`;
   navigator.clipboard.writeText(text).then(() => toast('✓ SQL copied to clipboard')).catch(() => toast('Copy failed — select manually'));
+}
+
+// ── CACHED ANSWERS ──
+let _cacheAnswers = [];
+let _editingCacheId = null;
+
+async function loadCacheAnswers() {
+  const wrap = document.getElementById('cache-table-wrap');
+  wrap.innerHTML = '<div class="loading"><div class="spin"></div>Loading...</div>';
+  try {
+    const d = await api('getCachedAnswers');
+    _cacheAnswers = d.answers || [];
+    if (!_cacheAnswers.length) {
+      wrap.innerHTML = '<p style="padding:20px;color:var(--t3);font-size:13px;text-align:center">No cached answers yet. Click "+ Add Answer" to create one.</p>';
+      return;
+    }
+    const rows = _cacheAnswers.map(a => {
+      const kws = (a.keywords||'').split(',').map(k=>k.trim()).filter(Boolean)
+        .map(k=>`<span style="background:var(--ibg);color:var(--it);font-size:10.5px;padding:1px 6px;border-radius:6px;margin:1px 2px 1px 0;display:inline-block">${esc(k)}</span>`).join('');
+      const stCls = a.is_active ? 'sp-ok' : 'sp-warn';
+      const stTxt = a.is_active ? 'Active' : 'Off';
+      const preview = esc((a.answer||'').slice(0,70)) + (a.answer?.length>70?'…':'');
+      return `<tr>
+        <td style="font-weight:600;font-size:13px;min-width:120px">${esc(a.question)}</td>
+        <td style="min-width:140px">${kws}</td>
+        <td style="max-width:200px;color:var(--t2);font-size:12px">${preview}</td>
+        <td><span class="spill ${stCls}" style="font-size:11px">${stTxt}</span></td>
+        <td style="text-align:right;color:var(--t3);font-size:12px;font-weight:600">${a.hit_count||0}</td>
+        <td style="white-space:nowrap">
+          <button class="btn bs bsm" style="margin-right:3px" onclick="editCacheAnswer(${a.id})">Edit</button>
+          <button class="btn bs bsm" style="margin-right:3px" onclick="toggleCacheAnswer(${a.id},${!a.is_active})">${a.is_active?'Disable':'Enable'}</button>
+          <button class="btn bd2 bsm" onclick="deleteCacheAnswer(${a.id})">Delete</button>
+        </td>
+      </tr>`;
+    }).join('');
+    wrap.innerHTML = `<div class="tbl-wrap"><table>
+      <thead><tr><th>Question</th><th>Keywords</th><th>Answer Preview</th><th>Status</th><th>Hits</th><th>Actions</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  } catch(e) {
+    wrap.innerHTML = `<p style="padding:16px;color:var(--dt);font-size:13px">Error: ${esc(e.message)}</p>`;
+  }
+}
+
+function showCacheForm() {
+  _editingCacheId = null;
+  document.getElementById('cache-form-title').textContent = 'Add Cached Answer';
+  document.getElementById('ca-question').value = '';
+  document.getElementById('ca-keywords').value = '';
+  document.getElementById('ca-answer').value = '';
+  document.getElementById('ca-active').checked = true;
+  document.getElementById('cache-form-card').style.display = '';
+  document.getElementById('ca-question').focus();
+}
+
+function hideCacheForm() {
+  _editingCacheId = null;
+  document.getElementById('cache-form-card').style.display = 'none';
+}
+
+function editCacheAnswer(id) {
+  const a = _cacheAnswers.find(x => x.id === id);
+  if (!a) { toast('Refresh the list and try again'); return; }
+  _editingCacheId = id;
+  document.getElementById('cache-form-title').textContent = 'Edit Cached Answer';
+  document.getElementById('ca-question').value = a.question || '';
+  document.getElementById('ca-keywords').value = a.keywords || '';
+  document.getElementById('ca-answer').value = a.answer || '';
+  document.getElementById('ca-active').checked = !!a.is_active;
+  document.getElementById('cache-form-card').style.display = '';
+  document.getElementById('cache-form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function saveCacheAnswer() {
+  const question = document.getElementById('ca-question').value.trim();
+  const keywords = document.getElementById('ca-keywords').value.trim();
+  const answer   = document.getElementById('ca-answer').value.trim();
+  const is_active = document.getElementById('ca-active').checked;
+  if (!question || !keywords || !answer) { toast('Question, keywords, and answer are all required'); return; }
+  try {
+    if (_editingCacheId) {
+      await api('updateCachedAnswer', { id: _editingCacheId, question, keywords, answer, is_active });
+      toast('✓ Answer updated');
+    } else {
+      await api('addCachedAnswer', { question, keywords, answer });
+      toast('✓ Answer added');
+    }
+    hideCacheForm();
+    loadCacheAnswers();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function toggleCacheAnswer(id, active) {
+  try {
+    await api('updateCachedAnswer', { id, is_active: active });
+    toast(active ? '✓ Enabled' : '✓ Disabled');
+    loadCacheAnswers();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function deleteCacheAnswer(id) {
+  if (!confirm('Delete this cached answer? This cannot be undone.')) return;
+  try {
+    await api('deleteCachedAnswer', { id });
+    toast('✓ Deleted');
+    loadCacheAnswers();
+  } catch(e) { toast('Error: ' + e.message); }
 }
 
 // ── HELPERS ──

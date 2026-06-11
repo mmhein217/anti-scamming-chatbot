@@ -599,7 +599,7 @@ async function loadOverview() {
     // Status pills
     const pills = [];
     pills.push(`<div class="spill sp-ok"><div class="sp-dot"></div>Authenticated ✓</div>`);
-    pills.push(`<div class="spill ${d.apiConfigured?'sp-ok':'sp-err'}"><div class="sp-dot"></div>${d.apiConfigured ? 'Gemini API Connected ✓' : '⚠ GEMINI_API_KEY not set'}</div>`);
+    pills.push(`<div class="spill ${d.apiConfigured?'sp-ok':'sp-err'}"><div class="sp-dot"></div>${d.apiConfigured ? 'Groq API Connected ✓' : '⚠ GROQ_API_KEY not set'}</div>`);
     pills.push(`<div class="spill ${d.supabaseConfigured?'sp-ok':'sp-warn'}"><div class="sp-dot"></div>${d.supabaseConfigured ? 'Supabase Connected ✓' : 'Supabase not configured'}</div>`);
     pills.push(`<div class="spill sp-info"><div class="sp-dot"></div>Model: ${d.model}</div>`);
     pills.push(`<div style="margin-left:auto;font-size:11.5px;color:var(--t3)">${new Date(d.timestamp).toLocaleString()}</div>`);
@@ -614,9 +614,9 @@ async function loadOverview() {
     // API card
     document.getElementById('api-card').innerHTML = d.apiConfigured
       ? `<div class="spill sp-ok" style="display:inline-flex;margin-bottom:10px"><div class="sp-dot"></div>Connected</div>
-         <p style="font-size:12.5px;color:var(--t2);line-height:1.6">Gemini <strong>${d.model}</strong> is active. All chat requests are proxied securely through the Netlify serverless function. API key is never exposed to the browser.</p>`
+         <p style="font-size:12.5px;color:var(--t2);line-height:1.6">Groq <strong>${d.model}</strong> is active. All chat requests are proxied securely through the serverless function. API key is never exposed to the browser.</p>`
       : `<div class="spill sp-err" style="display:inline-flex;margin-bottom:10px"><div class="sp-dot"></div>Not configured</div>
-         <p style="font-size:12.5px;color:var(--dt);line-height:1.6">Add <strong>GEMINI_API_KEY</strong> to Netlify → Site → Environment variables, then redeploy. Get your key at <strong>aistudio.google.com</strong>.</p>`;
+         <p style="font-size:12.5px;color:var(--dt);line-height:1.6">Add <strong>GROQ_API_KEY</strong> to Vercel → Project → Environment Variables, then redeploy. Get your free key at <strong>console.groq.com</strong>.</p>`;
 
     // DB card
     document.getElementById('db-card').innerHTML = d.supabaseConfigured

@@ -51,9 +51,9 @@ exports.handler = async function(event) {
     // ── STATS ──
     if (action === 'stats') {
       let stats = {
-        apiConfigured: !!process.env.GEMINI_API_KEY,
+        apiConfigured: !!process.env.GROQ_API_KEY,
         supabaseConfigured: hasSupabase,
-        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+        model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
         timestamp: new Date().toISOString(),
         totalMessages: 0,
         totalSessions: 0,

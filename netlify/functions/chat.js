@@ -35,17 +35,6 @@ function matchScamTopic(topics, text) {
   return bestScore >= 1 ? { topic: best, score: bestScore } : null;
 }
 
-function buildRAGContext(topic) {
-  const lines = [];
-  if (topic.scam_name) lines.push(`Scam အမျိုးအစား: ${topic.scam_name}`);
-  if (topic.mechanism) lines.push(`ဖြစ်ပွားပုံ: ${topic.mechanism}`);
-  const flags = Array.isArray(topic.red_flags) ? topic.red_flags : (typeof topic.red_flags === 'string' ? JSON.parse(topic.red_flags || '[]') : []);
-  if (flags.length) lines.push(`သတိပေးနိမိတ်များ:\n${flags.map(f => `• ${f}`).join('\n')}`);
-  if (topic.prevention_guide) lines.push(`ကာကွယ်နည်း: ${topic.prevention_guide}`);
-  if (topic.answer) lines.push(`အသေးစိတ်: ${topic.answer}`);
-  return lines.join('\n\n');
-}
-
 // ── System Prompt: ScamAware MM
 const SYSTEM_PROMPT = `You are "ScamAware MM" (ScamGuard AI), a production-grade AI expert dedicated to educating the public and preventing online scams, mobile banking frauds (KPay/Wave Money), and cybercrimes in Myanmar. Your primary directive is to protect users by offering actionable, empathetic, and urgent advice.
 
@@ -366,7 +355,7 @@ exports.handler = async function(event) {
   // ── Gemini API call — try primary model, then fallback
   const MODELS = [
     process.env.GEMINI_MODEL || 'gemini-2.0-flash',
-    'gemini-1.5-flash'
+    'gemini-1.5-flash-latest'
   ];
 
   const FALLBACK_REPLY = `သင်မေးသောမေးခွန်းကို လက်ခံရရှိပါသည်။ ယခုအချိန်တွင် AI ဝန်ဆောင်မှု ယာယီအနှောင့်အယှက်ရှိနေပါသည်။

@@ -95,14 +95,48 @@ async function logToSupabase(url, key, data) {
 }
 
 // ── Convert OpenAI-style messages → Gemini contents format
-// Gemini uses role "user" / "model" (not "assistant")
-// Gemini does not accept a system message inside contents —
-// it goes in systemInstruction separately
 function toGeminiContents(messages) {
   return messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }]
   }));
+}
+
+// ── Monthly cost limit helpers
+// Gemini 2.5 Flash: $0.15/1M input tokens, $0.60/1M output tokens
+function estimateCost(inputTokens, outputTokens) {
+  return (inputTokens * 0.15 + outputTokens * 0.60) / 1_000_000;
+}
+
+async function checkMonthlyLimit(supabaseUrl, supabaseKey) {
+  const limit = parseFloat(process.env.MONTHLY_COST_LIMIT_USD || '2.0');
+  const month = new Date().toISOString().slice(0, 7); // "2026-06"
+  try {
+    const r = await fetch(
+      `${supabaseUrl}/rest/v1/monthly_usage?month=eq.${month}&select=estimated_cost_usd`,
+      { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+    );
+    if (!r.ok) return true; // fail open
+    const rows = await r.json();
+    const cost = rows[0]?.estimated_cost_usd || 0;
+    return parseFloat(cost) < limit;
+  } catch {
+    return true; // fail open
+  }
+}
+
+async function incrementMonthlyUsage(supabaseUrl, supabaseKey, inputTokens, outputTokens) {
+  const month = new Date().toISOString().slice(0, 7);
+  const cost = estimateCost(inputTokens, outputTokens);
+  fetch(`${supabaseUrl}/rest/v1/rpc/increment_monthly_usage`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`
+    },
+    body: JSON.stringify({ p_month: month, p_requests: 1, p_cost: cost })
+  }).catch(() => {});
 }
 
 // ── Cached answers — in-memory store with 5-min TTL (warm Lambda reuse)
@@ -203,6 +237,20 @@ exports.handler = async function(event) {
     created_at: new Date().toISOString()
   });
 
+  // ── Check monthly cost limit
+  if (supabaseUrl && supabaseKey) {
+    const underLimit = await checkMonthlyLimit(supabaseUrl, supabaseKey);
+    if (!underLimit) {
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({
+          reply: 'ဝမ်းနည်းပါတယ် — ဒီလအတွက် AI ဝန်ဆောင်မှု limit ရောက်နေပါပြီ။ နောက်လမှ ပြန်မေးနိုင်ပါတယ်။\n(Monthly AI limit reached. Please try again next month.)',
+          cached: false
+        })
+      };
+    }
+  }
+
   // ── Check cached answers before calling Gemini
   if (supabaseUrl && supabaseKey) {
     const cachedList = await loadCachedAnswers(supabaseUrl, supabaseKey);
@@ -295,8 +343,12 @@ exports.handler = async function(event) {
       created_at: new Date().toISOString()
     });
 
-    // Return reply + token usage info if available
+    // Increment monthly usage (fire-and-forget)
     const usage = data.usageMetadata || null;
+    if (supabaseUrl && supabaseKey && usage) {
+      incrementMonthlyUsage(supabaseUrl, supabaseKey, usage.promptTokenCount || 0, usage.candidatesTokenCount || 0);
+    }
+
     return { statusCode: 200, headers, body: JSON.stringify({ reply, usage, model }) };
 
   } catch (err) {
